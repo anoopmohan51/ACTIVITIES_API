@@ -5,6 +5,7 @@ import { ExperienceVideo } from './ExperienceVideo';
 import { ExperienceImage } from './ExperienceImage';
 
 interface ExperienceAttributes {
+    images?: ExperienceImage[];
     id?: number;
     name: string;
     status?: string;
@@ -53,6 +54,7 @@ interface ExperienceAttributes {
 }
 
 export class Experience extends Model<ExperienceAttributes> {
+    declare images?: ExperienceImage[];
     declare id: CreationOptional<number>;
     declare name: string;
     declare status: CreationOptional<string>;

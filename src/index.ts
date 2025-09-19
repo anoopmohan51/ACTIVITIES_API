@@ -35,16 +35,24 @@ const multer = require('multer');
 const storage = multer.diskStorage({
     destination: (req: any, file: any, cb: any) => {
         // Get experience_id from the URL for both POST and PUT requests
-        let experience_id;
+        let experience_id = 'temp';
         if (req.method === 'PUT') {
-            experience_id = req.params.id;
-        } else if (req.method === 'POST') {
-            // For POST, we'll move files after creating the experience
-            experience_id = 'new';
+            // Extract ID from URL path for PUT requests
+            const matches = req.originalUrl.match(/\/api\/experience\/(\d+)/);
+            if (matches && matches[1]) {
+                experience_id = matches[1];
+            }
         }
 
+        console.log('Multer destination debug:', {
+            method: req.method,
+            url: req.originalUrl,
+            experience_id
+        });
+
         const type = file.fieldname === 'video' ? 'videos' : 'images';
-        const dir = path.join(__dirname, '..', type, experience_id.toString());
+        const dir = path.join('/app', type, experience_id);
+        console.log(`Creating directory: ${dir}`);
         
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
@@ -54,7 +62,22 @@ const storage = multer.diskStorage({
     filename: (req: any, file: any, cb: any) => {
         const timestamp = new Date().getTime();
         const ext = path.extname(file.originalname);
-        const experience_id = req.method === 'PUT' ? req.params.id : 'new';
+        
+        // Extract ID from URL path for PUT requests
+        let experience_id = 'temp';
+        if (req.method === 'PUT') {
+            const matches = req.originalUrl.match(/\/api\/experience\/(\d+)/);
+            if (matches && matches[1]) {
+                experience_id = matches[1];
+            }
+        }
+
+        console.log('Multer filename debug:', {
+            method: req.method,
+            url: req.originalUrl,
+            experience_id
+        });
+
         cb(null, `${experience_id}_${timestamp}${ext}`);
     }
 });
