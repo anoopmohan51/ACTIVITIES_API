@@ -808,6 +808,208 @@ router.get('/site/:siteId', async (req, res) => {
     }
 });
 
-// ... rest of the file remains unchanged ...
+/**
+ * @route POST /api/experience/filter
+ * @desc Filter experiences by status and category
+ */
+/**
+ * @route PATCH /api/experience/:id
+ * @desc Update specific fields of an experience
+ */
+router.patch('/:id', async (req, res) => {
+    try {
+        const experienceId = parseInt(req.params.id);
+        
+        // Find the experience
+        const experience = await Experience.findByPk(experienceId);
+        
+        if (!experience) {
+            return handleErrorResponse(res, {
+                statusCode: 404,
+                message: 'Experience not found',
+                errors: [{
+                    path: 'id',
+                    message: 'Experience with the provided ID does not exist'
+                }]
+            });
+        }
+
+        // Update only the fields that are provided in the request body
+        await experience.update(req.body);
+
+        // Get the updated experience with relations
+        const updatedExperience = await Experience.findByPk(experienceId, {
+            include: [
+                {
+                    model: Category,
+                    as: 'category',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: Season,
+                    as: 'season',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: ExperienceImage,
+                    as: 'images',
+                    attributes: ['id', 'path', 'name', 'uploaded_file_name']
+                }
+            ]
+        });
+
+        if (!updatedExperience) {
+            return handleErrorResponse(res, {
+                statusCode: 404,
+                message: 'Updated experience not found',
+                errors: [{
+                    path: 'id',
+                    message: 'Experience was updated but could not be retrieved'
+                }]
+            });
+        }
+
+        // Format response
+        const imageUrls = updatedExperience?.images?.map(img => img.path) || [];
+        const responseData = {
+            ...(updatedExperience?.toJSON() || {}),
+            videosUrl: updatedExperience.videosUrl || null,
+            imagesUrl: imageUrls,
+            category_name: (updatedExperience as any).category?.name || null,
+            season_name: (updatedExperience as any).season?.name || null,
+            // Remove nested relations
+            images: undefined,
+            category: undefined,
+            season: undefined
+        };
+
+        return handleSuccessResponse(res, {
+            message: 'Experience updated successfully',
+            data: responseData
+        });
+
+    } catch (error) {
+        console.error('Error updating experience:', error);
+        return handleErrorResponse(res, {
+            statusCode: 500,
+            message: error instanceof Error ? error.message : 'Internal server error',
+            errors: [{
+                path: 'server',
+                message: error instanceof Error ? error.message : 'An unexpected error occurred'
+            }]
+        });
+    }
+});
+
+router.post('/filter', async (req, res) => {
+    try {
+        // Get pagination from query params
+        const limit = parseInt(req.query.limit as string) || 10;  // Default limit to 10
+        const offset = parseInt(req.query.offset as string) || 0; // Default offset to 0
+        
+        // Get filters from request body
+        const { status, categoryId } = req.body;
+        
+        // Build where clause
+        const whereClause: any = {
+            is_delete: false, // Always exclude deleted records
+            site_id: "site457"
+        };
+
+        // Add status filter if provided
+        if (status) {
+            whereClause.status = status;
+        }
+
+        // Add categoryId filter if provided in query params
+        if (categoryId) {
+            whereClause.categoryId = categoryId;
+        }
+        // Fetch filtered experiences with their relations and total count
+        const { count, rows: experiences } = await Experience.findAndCountAll({
+            where: whereClause,
+            limit: Number(limit),
+            offset: Number(offset),
+            include: [
+                {
+                    model: Category,
+                    as: 'category',
+                    attributes: ['id', 'name'],
+                    required: false
+                },
+                {
+                    model: Season,
+                    as: 'season',
+                    attributes: ['id', 'name'],
+                    required: false
+                },
+                {
+                    model: ExperienceImage,
+                    as: 'images',
+                    attributes: ['id', 'path', 'name', 'uploaded_file_name']
+                }
+            ],
+            order: [['createdAt', 'DESC']] // Most recent first
+        });
+
+        // Check if no experiences found
+        if (!experiences || experiences.length === 0) {
+            return handleSuccessResponse(res, {
+                message: 'No experiences found with the given filters',
+                data: [] // Return empty array instead of null
+            });
+        }
+
+        // Format experiences using the common response format
+        const formattedExperiences = experiences.map(experience => {
+            // Get image URLs from the related images
+            const imageUrls = experience.images?.map(img => img.path) || [];
+
+            // Prepare response data
+            const responseData = {
+                ...experience.toJSON(),
+                videosUrl: experience.videosUrl || null,
+                imagesUrl: imageUrls,
+                category_name: (experience as any).category?.name || null,
+                season_name: (experience as any).season?.name || null,
+                // Remove nested relations from the response
+                images: undefined,
+                category: undefined,
+                season: undefined
+            };
+
+            return responseData;
+        });
+
+        // Calculate pagination metadata
+        const totalPages = Math.ceil(count / limit);
+        const currentPage = Math.floor(offset / limit) + 1;
+
+        return handleSuccessResponse(res, {
+            message: 'Experiences retrieved successfully',
+            data: {
+                experiences: formattedExperiences,
+                pagination: {
+                    total: count,
+                    totalPages,
+                    currentPage,
+                    limit: Number(limit),
+                    offset: Number(offset)
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Error filtering experiences:', error);
+        return handleErrorResponse(res, {
+            statusCode: 500,
+            message: error instanceof Error ? error.message : 'Internal server error',
+            errors: [{
+                path: 'server',
+                message: error instanceof Error ? error.message : 'An unexpected error occurred'
+            }]
+        });
+    }
+});
 
 export default router;
