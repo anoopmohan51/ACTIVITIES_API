@@ -4,6 +4,8 @@ import { Category } from '../models/Category';
 export const listCategoriesBySite = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const siteId = req.params.siteId;
+    const limit = parseInt(req.query.limit as string) || 10;  // Default limit to 10
+    const offset = parseInt(req.query.offset as string) || 0; // Default offset to 0
 
     if (!siteId) {
       return res.status(400).json({
@@ -13,18 +15,31 @@ export const listCategoriesBySite = async (req: Request, res: Response, next: Ne
       });
     }
 
+    // Get total count of all records
+    const total_count = await Category.count({
+      where: {
+        site_id: siteId,
+        is_delete: false
+      }
+    });
+
+    // Get paginated records
     const categories = await Category.findAll({
       where: {
         site_id: siteId,
         is_delete: false
       },
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
+      limit: Number(limit),
+      offset: Number(offset)
     });
 
     return res.status(200).json({
       success: true,
       message: 'Categories retrieved successfully',
-      data: categories
+      data: categories,
+      count: categories.length,
+      total_count
     });
   } catch (error) {
     next(error);
