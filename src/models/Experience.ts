@@ -46,8 +46,9 @@ interface ExperienceAttributes {
     billingInstructions?: string;
     company_id?: string;
     site_id?: string;
-    created_user?: number;
-    updated_user?: number;
+    department_id?: string;
+    created_user?: string;
+    updated_user?: string;
     is_delete: boolean;
     createdAt?: Date;
     updatedAt?: Date;
@@ -95,8 +96,9 @@ export class Experience extends Model<ExperienceAttributes> {
     declare billingInstructions: CreationOptional<string>;
     declare company_id: CreationOptional<string>;
     declare site_id: CreationOptional<string>;
-    declare created_user: CreationOptional<number>;
-    declare updated_user: CreationOptional<number>;
+    declare department_id: CreationOptional<string>;
+    declare created_user: CreationOptional<string>;
+    declare updated_user: CreationOptional<string>;
     declare is_delete: boolean;
     declare readonly createdAt: CreationOptional<Date>;
     declare readonly updatedAt: CreationOptional<Date>;
@@ -298,12 +300,16 @@ export class Experience extends Model<ExperienceAttributes> {
                     type: DataTypes.TEXT,
                     allowNull: true,
                 },
+                department_id: {
+                    type: DataTypes.CHAR(50),
+                    allowNull: true,
+                },
                 created_user: {
-                    type: DataTypes.INTEGER,
+                    type: DataTypes.CHAR(50),
                     allowNull: true,
                 },
                 updated_user: {
-                    type: DataTypes.INTEGER,
+                    type: DataTypes.CHAR(50),
                     allowNull: true,
                 },
                 is_delete: {

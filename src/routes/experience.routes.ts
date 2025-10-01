@@ -118,8 +118,8 @@ router.post('/', async (req, res) => {
             // Required fields with proper type conversion
             site_id: formData.site_id || undefined,
             company_id: formData.company_id || undefined,
-            created_user: formData.created_user ? parseInt(formData.created_user) : undefined,
-            updated_user: formData.updated_user ? parseInt(formData.updated_user) : undefined,
+            created_user: formData.created_user || undefined,
+            updated_user: formData.updated_user || undefined,
             is_delete: formData.is_delete === 'true',
             name: formData.name || 'Untitled Experience',
             status: 'pending',
@@ -132,6 +132,7 @@ router.post('/', async (req, res) => {
             // Number fields
             categoryId: formData.categoryId ? parseInt(formData.categoryId) : undefined,
             seasonId: formData.seasonId ? parseInt(formData.seasonId) : undefined,
+            department_id: formData.department_id || undefined,
             minimumParticipant: formData.minimumParticipant ? parseInt(formData.minimumParticipant) : undefined,
             maximumParticipant: formData.maximumParticipant ? parseInt(formData.maximumParticipant) : undefined,
 
@@ -489,7 +490,7 @@ router.put('/:id', async (req, res) => {
             // Required fields with proper type conversion
             site_id: formData.site_id || experience.site_id,
             company_id: formData.company_id || experience.company_id,
-            updated_user: formData.updated_user ? parseInt(formData.updated_user) : experience.updated_user,
+            updated_user: formData.updated_user || experience.updated_user,
             is_delete: formData.is_delete === 'true' || experience.is_delete,
             name: formData.name || experience.name,
             status: formData.status || experience.status,
@@ -542,6 +543,7 @@ router.put('/:id', async (req, res) => {
             termsAndConditions: formData.termsAndConditions || experience.termsAndConditions,
             costBreakdown: formData.costBreakdown || experience.costBreakdown,
             billingInstructions: formData.billingInstructions || experience.billingInstructions,
+            department_id: formData.department_id || experience.department_id,
         };
 
         console.log('\nProcessed Update Data:', experienceData);
