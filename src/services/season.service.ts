@@ -90,4 +90,46 @@ export class SeasonService {
       throw new Error(`Error deleting season: ${errorMessage}`);
     }
   }
+
+  public async filterSeasons(filters: {
+    site_id?: string;
+    company_id?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ seasons: Season[]; total: number }> {
+    try {
+      const { site_id, company_id, limit = 10, offset = 0 } = filters;
+      
+      // Build where clause
+      const whereClause: any = {
+        is_delete: false
+      };
+
+      if (site_id) {
+        whereClause.site_id = site_id;
+      }
+
+      if (company_id) {
+        whereClause.company_id = company_id;
+      }
+
+      // Get total count
+      const total = await Season.count({
+        where: whereClause
+      });
+
+      // Get paginated results
+      const seasons = await Season.findAll({
+        where: whereClause,
+        limit: Math.min(limit, 100), // Cap at 100 to prevent abuse
+        offset: Math.max(offset, 0), // Ensure offset is not negative
+        order: [['createdAt', 'DESC']]
+      });
+
+      return { seasons, total };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      throw new Error(`Error filtering seasons: ${errorMessage}`);
+    }
+  }
 }

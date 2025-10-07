@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { Category } from '../models/Category';
+import { handleSuccessResponse, handleErrorResponse } from '../utils/response.handler';
 
 export const listCategoriesBySite = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -177,7 +178,7 @@ export const getCategory = async (req: Request, res: Response, next: NextFunctio
 
 export const createCategory = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, description, company_id, site_id, is_delete } = req.body;
+    const { name, description, company_id, site_id, is_delete,created_user} = req.body;
 
     const category = await Category.create({
       name,
@@ -185,7 +186,7 @@ export const createCategory = async (req: Request, res: Response, next: NextFunc
       company_id,
       site_id,
       is_delete: is_delete || false,
-      created_user: null, // You can add user authentication later
+      created_user: created_user,
       updated_user: null
     });
 
@@ -196,5 +197,84 @@ export const createCategory = async (req: Request, res: Response, next: NextFunc
     });
   } catch (error) {
     next(error);
+  }
+};
+
+export const filterCategories = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { site_id, company_id } = req.body;
+    const { limit, offset } = req.query;
+    
+    // Parse limit and offset with defaults
+    const parsedLimit = limit ? parseInt(limit as string) : 10;
+    const parsedOffset = offset ? parseInt(offset as string) : 0;
+    
+    // Validate limit and offset
+    if (isNaN(parsedLimit) || parsedLimit < 1) {
+      handleErrorResponse(res, {
+        statusCode: 400,
+        message: 'Invalid limit parameter'
+      });
+      return;
+    }
+    
+    if (isNaN(parsedOffset) || parsedOffset < 0) {
+      handleErrorResponse(res, {
+        statusCode: 400,
+        message: 'Invalid offset parameter'
+      });
+      return;
+    }
+
+    // Build where clause
+    const whereClause: any = {
+      is_delete: false
+    };
+
+    if (site_id) {
+      whereClause.site_id = site_id;
+    }
+
+    if (company_id) {
+      whereClause.company_id = company_id;
+    }
+
+    // Get total count
+    const total = await Category.count({
+      where: whereClause
+    });
+
+    // Get paginated results
+    const categories = await Category.findAll({
+      where: whereClause,
+      limit: Math.min(parsedLimit, 100), // Cap at 100 to prevent abuse
+      offset: Math.max(parsedOffset, 0), // Ensure offset is not negative
+      order: [['createdAt', 'DESC']]
+    });
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(total / parsedLimit);
+    const currentPage = Math.floor(parsedOffset / parsedLimit) + 1;
+
+    handleSuccessResponse(res, {
+      message: 'Categories filtered successfully',
+      data: {
+        categories: categories,
+        pagination: {
+          total: total,
+          totalPages,
+          currentPage,
+          limit: parsedLimit,
+          offset: parsedOffset
+        }
+      }
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    handleErrorResponse(res, {
+      statusCode: 500,
+      message: 'Failed to filter categories',
+      name: 'FilterError'
+    });
   }
 };

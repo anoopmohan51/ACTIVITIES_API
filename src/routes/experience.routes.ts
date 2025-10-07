@@ -488,8 +488,8 @@ router.put('/:id', async (req, res) => {
         // Create the experience object from form-data
         const experienceData = {
             // Required fields with proper type conversion
-            site_id: formData.site_id || experience.site_id,
-            company_id: formData.company_id || experience.company_id,
+            // site_id: formData.site_id || experience.site_id,
+            // company_id: formData.company_id || experience.company_id,
             updated_user: formData.updated_user || experience.updated_user,
             is_delete: formData.is_delete === 'true' || experience.is_delete,
             name: formData.name || experience.name,
@@ -910,12 +910,11 @@ router.post('/filter', async (req, res) => {
         const offset = parseInt(req.query.offset as string) || 0; // Default offset to 0
         
         // Get filters from request body
-        const { status, categoryId } = req.body;
-        
+        const { status, categoryId ,site_id,company_id} = req.body;
         // Build where clause
         const whereClause: any = {
             is_delete: false, // Always exclude deleted records
-            site_id: "site457"
+            // site_id: req.query.property_id as string
         };
 
         // Add status filter if provided
@@ -926,6 +925,12 @@ router.post('/filter', async (req, res) => {
         // Add categoryId filter if provided in query params
         if (categoryId) {
             whereClause.categoryId = categoryId;
+        }
+        if (site_id) {
+            whereClause.site_id = site_id;
+        }
+        if (company_id) {
+            whereClause.company_id = company_id;
         }
         // Fetch filtered experiences with their relations and total count
         const { count, rows: experiences } = await Experience.findAndCountAll({

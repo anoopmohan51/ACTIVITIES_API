@@ -17,6 +17,9 @@ router.use((req, res, next) => {
 // Define routes
 router.post('/', seasonController.createSeason);
 
+// Filter seasons with pagination (must come before /:id route)
+router.post('/filter', seasonController.filterSeasons);
+
 // Get seasons by site ID
 router.get('/site/:siteId', seasonController.getSeasonsBySiteId);
 

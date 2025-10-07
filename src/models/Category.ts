@@ -6,8 +6,8 @@ export class Category extends Model {
   public description!: string | null;
   public company_id!: string | null;
   public site_id!: string | null;
-  public created_user!: number | null;
-  public updated_user!: number | null;
+  public created_user!: string | null;
+  public updated_user!: string | null;
   public is_delete!: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -37,11 +37,11 @@ export class Category extends Model {
           allowNull: true,
         },
         created_user: {
-          type: DataTypes.INTEGER,
+          type: DataTypes.CHAR(50),
           allowNull: true,
         },
         updated_user: {
-          type: DataTypes.INTEGER,
+          type: DataTypes.CHAR(50),
           allowNull: true,
         },
         is_delete: {

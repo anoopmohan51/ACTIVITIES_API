@@ -6,8 +6,8 @@ interface SeasonAttributes {
   name: string;
   start_month: string | null;
   end_month: string | null;
-  created_user: number | null;
-  updated_user: number | null;
+  created_user: string | null;
+  updated_user: string | null;
   is_delete: boolean;
   company_id: string | null;
   site_id: string | null;
@@ -25,8 +25,8 @@ export class Season extends Model<SeasonAttributes, SeasonCreationAttributes> im
   public name!: string;
   public start_month!: string | null;
   public end_month!: string | null;
-  public created_user!: number | null;
-  public updated_user!: number | null;
+  public created_user!: string | null;
+  public updated_user!: string | null;
   public is_delete!: boolean;
   public company_id!: string | null;
   public site_id!: string | null;
@@ -54,11 +54,11 @@ export class Season extends Model<SeasonAttributes, SeasonCreationAttributes> im
           allowNull: true,
         },
         created_user: {
-          type: DataTypes.INTEGER,
+          type: DataTypes.CHAR(25),
           allowNull: true,
         },
         updated_user: {
-          type: DataTypes.INTEGER,
+          type: DataTypes.CHAR(25),
           allowNull: true,
         },
         is_delete: {

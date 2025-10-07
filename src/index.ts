@@ -189,7 +189,7 @@ app.get('/', (req, res) => {
 });
 
 // Season routes with explicit path
-const seasonBasePath = '/api/season';
+const seasonBasePath = '/api/seasons';
 console.log(`Registering season routes at ${seasonBasePath}`);
 
 // Debug middleware for season routes
@@ -201,7 +201,7 @@ app.use(seasonBasePath, (req, res, next) => {
 app.use(seasonBasePath, seasonRoutes);
 
 // Category routes
-const categoryBasePath = '/api/category';
+const categoryBasePath = '/api/categories';
 app.use(categoryBasePath, categoryRoutes);
 
 // Experience routes
@@ -232,9 +232,19 @@ app.use('*', (req, res, next) => {
 console.log('\n=== Registered Routes ===');
 console.log('Season Routes:');
 console.log(`POST ${seasonBasePath}`);
+console.log(`POST ${seasonBasePath}/filter`);
+console.log(`GET ${seasonBasePath}/site/:siteId`);
 console.log(`GET ${seasonBasePath}/:id`);
 console.log(`PUT ${seasonBasePath}/:id`);
 console.log(`DELETE ${seasonBasePath}/:id`);
+
+console.log('\nCategory Routes:');
+console.log(`POST ${categoryBasePath}`);
+console.log(`POST ${categoryBasePath}/filter`);
+console.log(`GET ${categoryBasePath}/site/:siteId`);
+console.log(`GET ${categoryBasePath}/:id`);
+console.log(`PUT ${categoryBasePath}/:id`);
+console.log(`DELETE ${categoryBasePath}/:id`);
 
 console.log('\nExperience Routes:');
 console.log(`POST ${experienceBasePath}`);
