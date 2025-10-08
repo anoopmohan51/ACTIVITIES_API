@@ -14,6 +14,8 @@ export class SeasonService {
       delete (data as any).is_delete;
       delete (data as any).createdAt;
       delete (data as any).updatedAt;
+      delete (data as any).company_id;
+      delete (data as any).site_id;
 
       await season.update(data);
       return season;

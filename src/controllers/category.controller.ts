@@ -119,13 +119,11 @@ export const updateCategory = async (req: Request, res: Response, next: NextFunc
     }
 
     // Update the category
-    const { name, description, company_id, site_id, updated_user } = req.body;
+    const { name, description, updated_user } = req.body;
     
     await existingCategory.update({
       name,
       description,
-      company_id,
-      site_id,
       updated_user
     });
 
