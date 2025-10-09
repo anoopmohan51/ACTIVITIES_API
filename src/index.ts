@@ -17,7 +17,7 @@ const port = process.env.PORT || 3000;
 // Enable CORS for all origins
 app.use(cors({
   origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
@@ -35,16 +35,24 @@ const multer = require('multer');
 const storage = multer.diskStorage({
     destination: (req: any, file: any, cb: any) => {
         // Get experience_id from the URL for both POST and PUT requests
-        let experience_id;
+        let experience_id = 'temp';
         if (req.method === 'PUT') {
-            experience_id = req.params.id;
-        } else if (req.method === 'POST') {
-            // For POST, we'll move files after creating the experience
-            experience_id = 'new';
+            // Extract ID from URL path for PUT requests
+            const matches = req.originalUrl.match(/\/api\/experience\/(\d+)/);
+            if (matches && matches[1]) {
+                experience_id = matches[1];
+            }
         }
 
+        console.log('Multer destination debug:', {
+            method: req.method,
+            url: req.originalUrl,
+            experience_id
+        });
+
         const type = file.fieldname === 'video' ? 'videos' : 'images';
-        const dir = path.join(__dirname, '..', type, experience_id.toString());
+        const dir = path.join('/app', type, experience_id);
+        console.log(`Creating directory: ${dir}`);
         
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
@@ -54,7 +62,22 @@ const storage = multer.diskStorage({
     filename: (req: any, file: any, cb: any) => {
         const timestamp = new Date().getTime();
         const ext = path.extname(file.originalname);
-        const experience_id = req.method === 'PUT' ? req.params.id : 'new';
+        
+        // Extract ID from URL path for PUT requests
+        let experience_id = 'temp';
+        if (req.method === 'PUT') {
+            const matches = req.originalUrl.match(/\/api\/experience\/(\d+)/);
+            if (matches && matches[1]) {
+                experience_id = matches[1];
+            }
+        }
+
+        console.log('Multer filename debug:', {
+            method: req.method,
+            url: req.originalUrl,
+            experience_id
+        });
+
         cb(null, `${experience_id}_${timestamp}${ext}`);
     }
 });
@@ -166,7 +189,7 @@ app.get('/', (req, res) => {
 });
 
 // Season routes with explicit path
-const seasonBasePath = '/api/season';
+const seasonBasePath = '/api/seasons';
 console.log(`Registering season routes at ${seasonBasePath}`);
 
 // Debug middleware for season routes
@@ -178,7 +201,7 @@ app.use(seasonBasePath, (req, res, next) => {
 app.use(seasonBasePath, seasonRoutes);
 
 // Category routes
-const categoryBasePath = '/api/category';
+const categoryBasePath = '/api/categories';
 app.use(categoryBasePath, categoryRoutes);
 
 // Experience routes
@@ -209,9 +232,19 @@ app.use('*', (req, res, next) => {
 console.log('\n=== Registered Routes ===');
 console.log('Season Routes:');
 console.log(`POST ${seasonBasePath}`);
+console.log(`POST ${seasonBasePath}/filter`);
+console.log(`GET ${seasonBasePath}/site/:siteId`);
 console.log(`GET ${seasonBasePath}/:id`);
 console.log(`PUT ${seasonBasePath}/:id`);
 console.log(`DELETE ${seasonBasePath}/:id`);
+
+console.log('\nCategory Routes:');
+console.log(`POST ${categoryBasePath}`);
+console.log(`POST ${categoryBasePath}/filter`);
+console.log(`GET ${categoryBasePath}/site/:siteId`);
+console.log(`GET ${categoryBasePath}/:id`);
+console.log(`PUT ${categoryBasePath}/:id`);
+console.log(`DELETE ${categoryBasePath}/:id`);
 
 console.log('\nExperience Routes:');
 console.log(`POST ${experienceBasePath}`);

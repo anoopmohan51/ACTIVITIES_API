@@ -5,6 +5,7 @@ import { ExperienceVideo } from './ExperienceVideo';
 import { ExperienceImage } from './ExperienceImage';
 
 interface ExperienceAttributes {
+    images?: ExperienceImage[];
     id?: number;
     name: string;
     status?: string;
@@ -45,14 +46,17 @@ interface ExperienceAttributes {
     billingInstructions?: string;
     company_id?: string;
     site_id?: string;
-    created_user?: number;
-    updated_user?: number;
+    department_id?: string;
+    reason_for_reject?: string;
+    created_user?: string;
+    updated_user?: string;
     is_delete: boolean;
     createdAt?: Date;
     updatedAt?: Date;
 }
 
 export class Experience extends Model<ExperienceAttributes> {
+    declare images?: ExperienceImage[];
     declare id: CreationOptional<number>;
     declare name: string;
     declare status: CreationOptional<string>;
@@ -93,8 +97,10 @@ export class Experience extends Model<ExperienceAttributes> {
     declare billingInstructions: CreationOptional<string>;
     declare company_id: CreationOptional<string>;
     declare site_id: CreationOptional<string>;
-    declare created_user: CreationOptional<number>;
-    declare updated_user: CreationOptional<number>;
+    declare department_id: CreationOptional<string>;
+    declare reason_for_reject: CreationOptional<string>;
+    declare created_user: CreationOptional<string>;
+    declare updated_user: CreationOptional<string>;
     declare is_delete: boolean;
     declare readonly createdAt: CreationOptional<Date>;
     declare readonly updatedAt: CreationOptional<Date>;
@@ -165,7 +171,7 @@ export class Experience extends Model<ExperienceAttributes> {
                     allowNull: true,
                 },
                 duration: {
-                    type: DataTypes.CHAR(30),
+                    type: DataTypes.STRING,
                     allowNull: true,
                 },
                 isExcursion: {
@@ -177,11 +183,11 @@ export class Experience extends Model<ExperienceAttributes> {
                     defaultValue: false,
                 },
                 guideType: {
-                    type: DataTypes.CHAR(30),
+                    type: DataTypes.STRING,
                     allowNull: true,
                 },
                 noOfGuides: {
-                    type: DataTypes.CHAR(30),
+                    type: DataTypes.STRING,
                     allowNull: true,
                 },
                 minimumParticipant: {
@@ -193,11 +199,11 @@ export class Experience extends Model<ExperienceAttributes> {
                     allowNull: true,
                 },
                 travellMedium: {
-                    type: DataTypes.CHAR(50),
+                    type: DataTypes.STRING,
                     allowNull: true,
                 },
                 prefferedTime: {
-                    type: DataTypes.CHAR(50),
+                    type: DataTypes.STRING,
                     allowNull: true,
                 },
                 operatingDays: {
@@ -289,19 +295,27 @@ export class Experience extends Model<ExperienceAttributes> {
                     allowNull: true,
                 },
                 company_id: {
-                    type: DataTypes.TEXT,
+                    type: DataTypes.STRING,
                     allowNull: true,
                 },
                 site_id: {
+                    type: DataTypes.STRING,
+                    allowNull: true,
+                },
+                department_id: {
+                    type: DataTypes.STRING,
+                    allowNull: true,
+                },
+                reason_for_reject: {
                     type: DataTypes.TEXT,
                     allowNull: true,
                 },
                 created_user: {
-                    type: DataTypes.INTEGER,
+                    type: DataTypes.STRING,
                     allowNull: true,
                 },
                 updated_user: {
-                    type: DataTypes.INTEGER,
+                    type: DataTypes.STRING,
                     allowNull: true,
                 },
                 is_delete: {

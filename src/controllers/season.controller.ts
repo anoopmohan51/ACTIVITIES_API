@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { SeasonService } from '../services/season.service';
 import { CreateSeasonDto, UpdateSeasonDto } from '../dtos/season.dto';
+import { handleSuccessResponse, handleErrorResponse } from '../utils/response.handler';
 
 export class SeasonController {
   private seasonService: SeasonService;
@@ -168,6 +169,67 @@ export class SeasonController {
         success: false,
         message: 'Failed to delete season',
         error: errorMessage
+      });
+    }
+  };
+
+  public filterSeasons = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { site_id, company_id, limit, offset } = req.body;
+      
+      // Parse limit and offset with defaults
+      const parsedLimit = limit ? parseInt(limit as string) : 10;
+      const parsedOffset = offset ? parseInt(offset as string) : 0;
+      
+      // Validate limit and offset
+      if (isNaN(parsedLimit) || parsedLimit < 1) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid limit parameter'
+        });
+        return;
+      }
+      
+      if (isNaN(parsedOffset) || parsedOffset < 0) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid offset parameter'
+        });
+        return;
+      }
+
+      const filters = {
+        site_id: site_id as string,
+        company_id: company_id as string,
+        limit: parsedLimit,
+        offset: parsedOffset
+      };
+
+      const result = await this.seasonService.filterSeasons(filters);
+      
+      // Calculate pagination metadata
+      const totalPages = Math.ceil(result.total / parsedLimit);
+      const currentPage = Math.floor(parsedOffset / parsedLimit) + 1;
+
+      handleSuccessResponse(res, {
+        message: 'Seasons filtered successfully',
+        data: {
+          seasons: result.seasons,
+          pagination: {
+            total: result.total,
+            totalPages,
+            currentPage,
+            limit: parsedLimit,
+            offset: parsedOffset
+          }
+        }
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      handleErrorResponse(res, {
+        statusCode: 500,
+        message: 'Failed to filter seasons',
+        name: 'FilterError'
       });
     }
   };

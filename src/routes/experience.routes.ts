@@ -1,7 +1,10 @@
 import express, { Router } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { Experience } from '../models/Experience';
 import { Category } from '../models/Category';
 import { Season } from '../models/Season';
+import { ExperienceImage } from '../models/ExperienceImage';
 import { handleErrorResponse, handleSuccessResponse } from '../utils/response.handler';
 import { handleVideoUpload } from '../utils/video.handler';
 import { handleImagesUpload } from '../utils/image.handler';
@@ -115,8 +118,8 @@ router.post('/', async (req, res) => {
             // Required fields with proper type conversion
             site_id: formData.site_id || undefined,
             company_id: formData.company_id || undefined,
-            created_user: formData.created_user ? parseInt(formData.created_user) : undefined,
-            updated_user: formData.updated_user ? parseInt(formData.updated_user) : undefined,
+            created_user: formData.created_user || undefined,
+            updated_user: formData.updated_user || undefined,
             is_delete: formData.is_delete === 'true',
             name: formData.name || 'Untitled Experience',
             status: 'pending',
@@ -129,6 +132,7 @@ router.post('/', async (req, res) => {
             // Number fields
             categoryId: formData.categoryId ? parseInt(formData.categoryId) : undefined,
             seasonId: formData.seasonId ? parseInt(formData.seasonId) : undefined,
+            department_id: formData.department_id || undefined,
             minimumParticipant: formData.minimumParticipant ? parseInt(formData.minimumParticipant) : undefined,
             maximumParticipant: formData.maximumParticipant ? parseInt(formData.maximumParticipant) : undefined,
 
@@ -210,8 +214,10 @@ router.post('/', async (req, res) => {
             if (files.video && files.video[0]) {
                 try {
                     const videoRecord = await handleVideoUpload(files.video[0], experience.id);
-                    await experience.update({ videosUrl: videoRecord.path });
-                    experience.videosUrl = videoRecord.path; // Update the instance for response
+                    if (videoRecord) {
+                        await experience.update({ videosUrl: videoRecord.path });
+                        experience.videosUrl = videoRecord.path; // Update the instance for response
+                    }
                 } catch (uploadError) {
                     console.error('Error handling video upload:', uploadError);
                     // Continue with the response even if video upload fails
@@ -291,9 +297,150 @@ router.post('/', async (req, res) => {
 });
 
 /**
+ * @route GET /api/experience/:id
+ * @desc Get a single experience by ID
+ */
+router.get('/:id', async (req, res) => {
+    try {
+        const experienceId = parseInt(req.params.id);
+
+        // Get experience with all related data
+        const experience = await Experience.findOne({
+            where: {
+                id: experienceId,
+                is_delete: false // Only get non-deleted experiences
+            },
+            include: [
+                {
+                    model: Category,
+                    as: 'category',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: Season,
+                    as: 'season',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: ExperienceImage,
+                    as: 'images',
+                    attributes: ['id', 'path', 'name', 'uploaded_file_name']
+                }
+            ]
+        });
+
+        if (!experience) {
+            return handleErrorResponse(res, {
+                statusCode: 404,
+                message: 'Experience not found',
+                errors: [{
+                    path: 'id',
+                    message: 'Experience not found or has been deleted'
+                }]
+            });
+        }
+
+        // Get image URLs from the related images
+        const imageUrls = experience.images?.map(img => img.path) || [];
+
+        // Prepare response data
+        const responseData = {
+            ...experience.toJSON(),
+            videosUrl: experience.videosUrl || null,
+            imagesUrl: imageUrls,
+            category_name: (experience as any).category?.name || null,
+            season_name: (experience as any).season?.name || null,
+            // Remove nested relations from the response
+            images: undefined,
+            category: undefined,
+            season: undefined
+        };
+
+        return handleSuccessResponse(res, {
+            message: 'Experience retrieved successfully',
+            data: responseData
+        });
+
+    } catch (error) {
+        console.error('Error fetching experience:', error);
+        return handleErrorResponse(res, {
+            statusCode: 500,
+            message: error instanceof Error ? error.message : 'Internal server error',
+            errors: [{
+                path: 'server',
+                message: error instanceof Error ? error.message : 'An unexpected error occurred'
+            }]
+        });
+    }
+});
+
+/**
  * @route GET /api/experience/site/:siteId
  * @desc List experiences by site_id
  */
+/**
+ * @route DELETE /api/experience/:id
+ * @desc Soft delete an experience by setting is_delete=true
+ */
+router.delete('/:id', async (req, res) => {
+    try {
+        const experienceId = parseInt(req.params.id);
+
+        // Find the experience
+        const experience = await Experience.findByPk(experienceId);
+
+        if (!experience) {
+            return handleErrorResponse(res, {
+                statusCode: 404,
+                message: 'Experience not found',
+                errors: [{
+                    path: 'id',
+                    message: 'Experience with the provided ID does not exist'
+                }]
+            });
+        }
+
+        // Check if already deleted
+        if (experience.is_delete) {
+            return handleErrorResponse(res, {
+                statusCode: 400,
+                message: 'Experience already deleted',
+                errors: [{
+                    path: 'id',
+                    message: 'Experience has already been marked as deleted'
+                }]
+            });
+        }
+
+        // Soft delete by setting is_delete=true
+        await experience.update({
+            is_delete: true,
+            updated_user: experience.updated_user, // Preserve the last updated user
+            updatedAt: new Date() // Update the timestamp
+        });
+        console.log(`Soft deleted experience with ID: ${experienceId}`);
+
+        return handleSuccessResponse(res, {
+            message: 'Experience deleted successfully',
+            data: {
+                id: experienceId,
+                is_delete: true
+            }
+        });
+
+    } catch (error) {
+        console.error('Error deleting experience:', error);
+        return handleErrorResponse(res, {
+            statusCode: 500,
+            message: error instanceof Error ? error.message : 'Internal server error',
+            errors: [{
+                path: 'server',
+                message: error instanceof Error ? error.message : 'An unexpected error occurred'
+            }]
+        });
+    }
+});
+
 /**
  * @route PUT /api/experience/:id
  * @desc Update an experience
@@ -341,9 +488,9 @@ router.put('/:id', async (req, res) => {
         // Create the experience object from form-data
         const experienceData = {
             // Required fields with proper type conversion
-            site_id: formData.site_id || experience.site_id,
-            company_id: formData.company_id || experience.company_id,
-            updated_user: formData.updated_user ? parseInt(formData.updated_user) : experience.updated_user,
+            // site_id: formData.site_id || experience.site_id,
+            // company_id: formData.company_id || experience.company_id,
+            updated_user: formData.updated_user || experience.updated_user,
             is_delete: formData.is_delete === 'true' || experience.is_delete,
             name: formData.name || experience.name,
             status: formData.status || experience.status,
@@ -396,6 +543,7 @@ router.put('/:id', async (req, res) => {
             termsAndConditions: formData.termsAndConditions || experience.termsAndConditions,
             costBreakdown: formData.costBreakdown || experience.costBreakdown,
             billingInstructions: formData.billingInstructions || experience.billingInstructions,
+            department_id: formData.department_id || experience.department_id,
         };
 
         console.log('\nProcessed Update Data:', experienceData);
@@ -407,63 +555,124 @@ router.put('/:id', async (req, res) => {
         if (req.files) {
             const files = req.files as { [fieldname: string]: Express.Multer.File[] };
             
-            // Handle video upload
-            console.log('\nChecking for video upload...');
-            if (files.video && files.video[0]) {
-                console.log('Video file found:', files.video[0].originalname);
+            // Handle video upload or removal
+            console.log('\nChecking for video changes...');
+            console.log('Form data video:', formData.video);
+            console.log('Files video:', files.video);
+
+            // Check if video field exists and is empty or invalid
+            const shouldRemoveVideo = ('video' in formData) && 
+                (!files.video || !files.video[0] || files.video[0].size === 0);
+
+            if (shouldRemoveVideo) {
+                // Remove existing video
+                console.log('Video field is empty or invalid, removing existing video');
+                try {
+                    await handleVideoUpload(null, experience.id);
+                    await experience.update({ videosUrl: '' });
+                    experience.videosUrl = ''; // Update the instance for response
+                    console.log('Video removed successfully');
+                } catch (removeError) {
+                    console.error('Error removing video:', removeError);
+                    console.error('Error details:', removeError instanceof Error ? removeError.message : removeError);
+                }
+            } else if (files.video && files.video[0]) {
+                // Upload new video
+                console.log('Valid video file found:', files.video[0].originalname);
                 try {
                     const videoRecord = await handleVideoUpload(files.video[0], experience.id);
-                    console.log('Video upload successful:', videoRecord);
-                    await experience.update({ videosUrl: videoRecord.path });
-                    experience.videosUrl = videoRecord.path; // Update the instance for response
+                    if (videoRecord) {
+                        console.log('Video upload successful:', videoRecord);
+                        await experience.update({ videosUrl: videoRecord.path });
+                        experience.videosUrl = videoRecord.path; // Update the instance for response
+                    }
                 } catch (uploadError) {
                     console.error('Error handling video upload:', uploadError);
                     console.error('Error details:', uploadError instanceof Error ? uploadError.message : uploadError);
                 }
             } else {
-                console.log('No video file in request');
+                console.log('No video changes requested');
             }
 
             // Handle images upload or removal
             console.log('\nChecking for image updates...');
             
+            // Get existing images first
+            let currentImages = await ExperienceImage.findAll({
+                where: { experience_id: experience.id }
+            });
+            console.log('Current images:', currentImages.map(img => img.toJSON()));
+
             // Check if we should remove images
-            // This happens when either removeImages=true OR when no images are provided in the update
-            if (formData.removeImages === 'true' || (!files.images && formData.hasOwnProperty('images'))) {
+            if (formData.removeImages === 'true') {
                 console.log('Removing all images as requested');
                 try {
                     await handleImagesUpload(null, experience.id);
-                    await experience.update({ imagesUrl: [] });
-                    experience.imagesUrl = []; // Update the instance for response
+                    currentImages = [];
                     console.log('All images removed successfully');
                 } catch (removeError) {
                     console.error('Error removing images:', removeError);
-                    console.error('Error details:', removeError instanceof Error ? removeError.message : removeError);
                 }
             }
-            // Handle new image uploads if present
-            else if (files.images && files.images.length > 0) {
-                console.log('Found', files.images.length, 'images:');
-                files.images.forEach((img, idx) => {
-                    console.log(`Image ${idx + 1}:`, img.originalname);
-                });
+            // Handle image updates
+            else {
+                let imagesToProcess = null;
+                
+                // Check if we have valid images in the request
+                if (files.images && files.images.length > 0) {
+                    console.log('Found', files.images.length, 'images in request');
+                    
+                    // Filter out invalid images (like /path/to/file)
+                    const validImages = files.images.filter(img => {
+                        const isValid = img.originalname !== 'file' && img.size > 0;
+                        if (!isValid) {
+                            console.log(`Skipping invalid image: ${img.originalname}`);
+                        }
+                        return isValid;
+                    });
+
+                    if (validImages.length > 0) {
+                        console.log('Processing', validImages.length, 'valid images');
+                        validImages.forEach((img, idx) => {
+                            console.log(`Image ${idx + 1}:`, img.originalname);
+                        });
+                        imagesToProcess = validImages;
+                    } else {
+                        console.log('No valid images to process, removing existing images');
+                        imagesToProcess = null;
+                    }
+                } else {
+                    console.log('No images in request, removing existing images');
+                    imagesToProcess = null;
+                }
+
                 try {
-                    const imageRecords = await handleImagesUpload(files.images, experience.id);
-                    console.log('Image upload successful:', imageRecords);
-                    const imagePaths = imageRecords.map(record => record.path);
-                    await experience.update({ imagesUrl: imagePaths });
-                    experience.imagesUrl = imagePaths; // Update the instance for response
-                    console.log('Updated experience with image paths:', imagePaths);
+                    // Process images or remove existing ones if no valid images
+                    const imageRecords = await handleImagesUpload(imagesToProcess, experience.id);
+                    console.log('Image handling successful:', imageRecords);
+                    
+                    // Update current images
+                    currentImages = imageRecords;
                 } catch (uploadError) {
-                    console.error('Error handling images upload:', uploadError);
-                    console.error('Error details:', uploadError instanceof Error ? uploadError.message : uploadError);
+                    console.error('Error handling images:', uploadError);
                 }
-            } else {
-                console.log('No image changes requested');
             }
+            
+            // Update experience with current image paths
+            const imagePaths = currentImages.map(img => img.path);
+            console.log('Final image paths:', imagePaths);
+            await experience.update({ imagesUrl: imagePaths });
+            experience.imagesUrl = imagePaths;
         }
 
-        // Fetch the updated experience with all fields
+        // Get the latest image records
+        const latestImages = await ExperienceImage.findAll({
+            where: { experience_id: experienceId }
+        });
+        const imageUrls = latestImages.map(img => img.path);
+        console.log('Latest image URLs:', imageUrls);
+
+        // Get category and season data
         const updatedExperience = await Experience.findByPk(experienceId, {
             include: [
                 {
@@ -479,19 +688,26 @@ router.put('/:id', async (req, res) => {
             ]
         });
 
-        // Get the current video and image URLs
-        const currentExperience = await Experience.findByPk(experienceId);
-        const videoUrl = currentExperience?.videosUrl;
-        const imageUrls = currentExperience?.imagesUrl;
+        if (!updatedExperience) {
+            throw new Error('Failed to fetch updated experience');
+        }
 
+        // Get the current video URL
+        const videoUrl = updatedExperience.videosUrl;
         console.log('Current video URL:', videoUrl);
-        console.log('Current image URLs:', imageUrls);
 
-        // Prepare response data
+        // Prepare response data with the latest media URLs and flatten category/season
+        const experienceJson = updatedExperience.toJSON();
         const responseData = {
-            ...updatedExperience?.toJSON(),
+            ...experienceJson,
             videosUrl: videoUrl || null,
-            imagesUrl: imageUrls || []
+            imagesUrl: imageUrls, // Use the directly fetched image URLs
+            category_name: (updatedExperience as any).category?.name || null,
+            season_name: (updatedExperience as any).season?.name || null,
+            // Remove nested relations from the response
+            images: undefined,
+            category: undefined,
+            season: undefined
         };
 
         console.log('Response data:', responseData);
@@ -594,6 +810,213 @@ router.get('/site/:siteId', async (req, res) => {
     }
 });
 
-// ... rest of the file remains unchanged ...
+/**
+ * @route POST /api/experience/filter
+ * @desc Filter experiences by status and category
+ */
+/**
+ * @route PATCH /api/experience/:id
+ * @desc Update specific fields of an experience
+ */
+router.patch('/:id', async (req, res) => {
+    try {
+        const experienceId = parseInt(req.params.id);
+        
+        // Find the experience
+        const experience = await Experience.findByPk(experienceId);
+        
+        if (!experience) {
+            return handleErrorResponse(res, {
+                statusCode: 404,
+                message: 'Experience not found',
+                errors: [{
+                    path: 'id',
+                    message: 'Experience with the provided ID does not exist'
+                }]
+            });
+        }
+
+        // Update only the fields that are provided in the request body
+        await experience.update(req.body);
+
+        // Get the updated experience with relations
+        const updatedExperience = await Experience.findByPk(experienceId, {
+            include: [
+                {
+                    model: Category,
+                    as: 'category',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: Season,
+                    as: 'season',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: ExperienceImage,
+                    as: 'images',
+                    attributes: ['id', 'path', 'name', 'uploaded_file_name']
+                }
+            ]
+        });
+
+        if (!updatedExperience) {
+            return handleErrorResponse(res, {
+                statusCode: 404,
+                message: 'Updated experience not found',
+                errors: [{
+                    path: 'id',
+                    message: 'Experience was updated but could not be retrieved'
+                }]
+            });
+        }
+
+        // Format response
+        const imageUrls = updatedExperience?.images?.map(img => img.path) || [];
+        const responseData = {
+            ...(updatedExperience?.toJSON() || {}),
+            videosUrl: updatedExperience.videosUrl || null,
+            imagesUrl: imageUrls,
+            category_name: (updatedExperience as any).category?.name || null,
+            season_name: (updatedExperience as any).season?.name || null,
+            // Remove nested relations
+            images: undefined,
+            category: undefined,
+            season: undefined
+        };
+
+        return handleSuccessResponse(res, {
+            message: 'Experience updated successfully',
+            data: responseData
+        });
+
+    } catch (error) {
+        console.error('Error updating experience:', error);
+        return handleErrorResponse(res, {
+            statusCode: 500,
+            message: error instanceof Error ? error.message : 'Internal server error',
+            errors: [{
+                path: 'server',
+                message: error instanceof Error ? error.message : 'An unexpected error occurred'
+            }]
+        });
+    }
+});
+
+router.post('/filter', async (req, res) => {
+    try {
+        // Get pagination from query params
+        const limit = parseInt(req.query.limit as string) || 10;  // Default limit to 10
+        const offset = parseInt(req.query.offset as string) || 0; // Default offset to 0
+        
+        // Get filters from request body
+        const { status, categoryId ,site_id,company_id} = req.body;
+        // Build where clause
+        const whereClause: any = {
+            is_delete: false, // Always exclude deleted records
+            // site_id: req.query.property_id as string
+        };
+
+        // Add status filter if provided
+        if (status) {
+            whereClause.status = status;
+        }
+
+        // Add categoryId filter if provided in query params
+        if (categoryId) {
+            whereClause.categoryId = categoryId;
+        }
+        if (site_id) {
+            whereClause.site_id = site_id;
+        }
+        if (company_id) {
+            whereClause.company_id = company_id;
+        }
+        // Fetch filtered experiences with their relations and total count
+        const { count, rows: experiences } = await Experience.findAndCountAll({
+            where: whereClause,
+            limit: Number(limit),
+            offset: Number(offset),
+            include: [
+                {
+                    model: Category,
+                    as: 'category',
+                    attributes: ['id', 'name'],
+                    required: false
+                },
+                {
+                    model: Season,
+                    as: 'season',
+                    attributes: ['id', 'name'],
+                    required: false
+                },
+                {
+                    model: ExperienceImage,
+                    as: 'images',
+                    attributes: ['id', 'path', 'name', 'uploaded_file_name']
+                }
+            ],
+            order: [['createdAt', 'DESC']] // Most recent first
+        });
+
+        // Check if no experiences found
+        if (!experiences || experiences.length === 0) {
+            return handleSuccessResponse(res, {
+                message: 'No experiences found with the given filters',
+                data: [] // Return empty array instead of null
+            });
+        }
+
+        // Format experiences using the common response format
+        const formattedExperiences = experiences.map(experience => {
+            // Get image URLs from the related images
+            const imageUrls = experience.images?.map(img => img.path) || [];
+
+            // Prepare response data
+            const responseData = {
+                ...experience.toJSON(),
+                videosUrl: experience.videosUrl || null,
+                imagesUrl: imageUrls,
+                category_name: (experience as any).category?.name || null,
+                season_name: (experience as any).season?.name || null,
+                // Remove nested relations from the response
+                images: undefined,
+                category: undefined,
+                season: undefined
+            };
+
+            return responseData;
+        });
+
+        // Calculate pagination metadata
+        const totalPages = Math.ceil(count / limit);
+        const currentPage = Math.floor(offset / limit) + 1;
+
+        return handleSuccessResponse(res, {
+            message: 'Experiences retrieved successfully',
+            data: {
+                experiences: formattedExperiences,
+                pagination: {
+                    total: count,
+                    totalPages,
+                    currentPage,
+                    limit: Number(limit),
+                    offset: Number(offset)
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Error filtering experiences:', error);
+        return handleErrorResponse(res, {
+            statusCode: 500,
+            message: error instanceof Error ? error.message : 'Internal server error',
+            errors: [{
+                path: 'server',
+                message: error instanceof Error ? error.message : 'An unexpected error occurred'
+            }]
+        });
+    }
+});
 
 export default router;
