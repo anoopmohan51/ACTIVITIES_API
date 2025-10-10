@@ -122,7 +122,7 @@ router.post('/', async (req, res) => {
             updated_user: formData.updated_user || undefined,
             is_delete: formData.is_delete === 'true',
             name: formData.name || 'Untitled Experience',
-            status: 'pending',
+            status: 'draft',
 
             // Boolean fields
             isExcursion: formData.isExcursion === 'true',
@@ -488,8 +488,6 @@ router.put('/:id', async (req, res) => {
         // Create the experience object from form-data
         const experienceData = {
             // Required fields with proper type conversion
-            // site_id: formData.site_id || experience.site_id,
-            // company_id: formData.company_id || experience.company_id,
             updated_user: formData.updated_user || experience.updated_user,
             is_delete: formData.is_delete === 'true' || experience.is_delete,
             name: formData.name || experience.name,

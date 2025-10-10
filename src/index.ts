@@ -7,6 +7,7 @@ import cors from 'cors';
 import seasonRoutes from './routes/season.routes';
 import categoryRoutes from './routes/category.routes';
 import experienceRoutes from './routes/experience.routes';
+import workflowRoutes from './routes/workflow.routes';
 import { errorHandler } from './middleware/error.middleware';
 
 dotenv.config();
@@ -210,6 +211,10 @@ const experienceBasePath = '/api/experience';
 // Move route registration before any other middleware
 app.use(experienceBasePath, experienceRoutes);
 
+// Workflow routes
+const workflowBasePath = '/api/workflow';
+app.use(workflowBasePath, workflowRoutes);
+
 console.log('\n=== Route Registration Debug ===');
 console.log('Experience base path:', experienceBasePath);
 console.log('Available routes:');
@@ -250,6 +255,13 @@ console.log('\nExperience Routes:');
 console.log(`POST ${experienceBasePath}`);
 console.log(`PUT ${experienceBasePath}/:id`);
 console.log(`GET ${experienceBasePath}/site/:siteId`);
+
+console.log('\nWorkflow Routes:');
+console.log(`POST ${workflowBasePath}`);
+console.log(`GET ${workflowBasePath}/company/:companyId`);
+console.log(`PUT ${workflowBasePath}/company/:companyId`);
+console.log(`DELETE ${workflowBasePath}/company/:companyId`);
+console.log(`GET ${workflowBasePath}/:id`);
 
 // 404 handler - with more specific error handling
 app.use((req, res) => {

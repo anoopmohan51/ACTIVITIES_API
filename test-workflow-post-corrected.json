@@ -1,0 +1,65 @@
+// CORRECTED: POST /api/workflow
+// The payload format has been updated to match your structure
+
+const correctedPostPayload = [
+  {
+    "id": 1, // This will be ignored for POST (new records are created)
+    "level": 1,
+    "company_id": "60647362169aae1a65fb0db0",
+    "created_user": "60647362169aae1a65fb0db1",
+    "updated_user": "60647362169aae1a65fb0db1",
+    "is_delete": false,
+    "createdAt": "2025-10-10T12:38:51.230Z", // This will be ignored
+    "updatedAt": "2025-10-10T12:38:51.230Z", // This will be ignored
+    "levelMappings": [
+      {
+        "user_id": "68b160d2169aae52647af249",
+        "usergroup": null,
+        "createdAt": "2025-10-10T12:38:51.230Z", // This will be ignored
+        "updatedAt": "2025-10-10T12:38:51.230Z"  // This will be ignored
+      }
+    ]
+  }
+];
+
+console.log('CORRECTED POST Payload for /api/workflow:');
+console.log(JSON.stringify(correctedPostPayload, null, 2));
+
+console.log('\nKey Changes Made:');
+console.log('1. Service now accepts "levelMappings" instead of "approval_mapping"');
+console.log('2. Controller expects direct array payload (not wrapped in object)');
+console.log('3. Uses provided created_user and updated_user values');
+console.log('4. Ignores id, createdAt, updatedAt fields for new records');
+console.log('5. Creates new approval level and level mappings');
+
+console.log('\nExpected Response:');
+const expectedResponse = {
+  "success": true,
+  "message": "Approval levels created successfully",
+  "data": [
+    {
+      "approval_level": {
+        "id": 1,
+        "level": 1,
+        "company_id": "60647362169aae1a65fb0db0",
+        "created_user": "60647362169aae1a65fb0db1",
+        "updated_user": "60647362169aae1a65fb0db1",
+        "is_delete": false,
+        "createdAt": "2025-01-15T12:38:51.230Z",
+        "updatedAt": "2025-01-15T12:38:51.230Z"
+      },
+      "level_mappings": [
+        {
+          "id": 1,
+          "approvallevels": 1,
+          "user_id": "68b160d2169aae52647af249",
+          "usergroup": null,
+          "createdAt": "2025-01-15T12:38:51.230Z",
+          "updatedAt": "2025-01-15T12:38:51.230Z"
+        }
+      ]
+    }
+  ]
+};
+
+console.log(JSON.stringify(expectedResponse, null, 2));

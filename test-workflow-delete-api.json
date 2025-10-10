@@ -1,0 +1,36 @@
+// DELETE API Test for /api/workflow/company/123
+// This endpoint deletes ALL approval levels and their mappings for a company
+
+console.log('DELETE API Endpoint: http://localhost:3000/api/workflow/company/123');
+console.log('Method: DELETE');
+console.log('No request body required');
+
+console.log('\nExpected Behavior:');
+console.log('1. Find all approval levels for company_id = "123"');
+console.log('2. Delete all level mappings for those approval levels');
+console.log('3. Delete all approval levels for company_id = "123"');
+console.log('4. Return success message with count of deleted records');
+
+console.log('\nExpected Response:');
+const expectedResponse = {
+  "success": true,
+  "message": "Successfully deleted 2 approval level(s) and their mappings for company 123",
+  "data": {
+    "deletedCount": 2,
+    "companyId": "123"
+  }
+};
+
+console.log(JSON.stringify(expectedResponse, null, 2));
+
+console.log('\nError Response (if company not found):');
+const errorResponse = {
+  "success": true,
+  "message": "Successfully deleted 0 approval level(s) and their mappings for company 123",
+  "data": {
+    "deletedCount": 0,
+    "companyId": "123"
+  }
+};
+
+console.log(JSON.stringify(errorResponse, null, 2));

@@ -5,6 +5,8 @@ import { Experience } from '../models/Experience';
 import { Category } from '../models/Category';
 import { ExperienceVideo } from '../models/ExperienceVideo';
 import { ExperienceImage } from '../models/ExperienceImage';
+import { ApprovalLevels } from '../models/ApprovalLevels';
+import { LevelMapping } from '../models/LevelMapping';
 
 dotenv.config();
 
@@ -90,11 +92,15 @@ export const initModels = async () => {
   Experience.initialize(sequelize); // Initialize Experience
   ExperienceVideo.initialize(sequelize); // Initialize ExperienceVideo after Experience
   ExperienceImage.initialize(sequelize); // Initialize ExperienceImage after Experience
+  ApprovalLevels.initialize(sequelize); // Initialize ApprovalLevels
+  LevelMapping.initialize(sequelize); // Initialize LevelMapping after ApprovalLevels
 
   // Set up associations after all models are initialized
   Experience.associate();
   ExperienceVideo.associate();
   ExperienceImage.associate();
+  ApprovalLevels.associate();
+  LevelMapping.associate();
 
   return {
     Activity,
@@ -102,6 +108,8 @@ export const initModels = async () => {
     Season,
     Experience,
     ExperienceVideo,
-    ExperienceImage
+    ExperienceImage,
+    ApprovalLevels,
+    LevelMapping
   };
 };
