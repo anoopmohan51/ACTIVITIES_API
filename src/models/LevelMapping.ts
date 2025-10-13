@@ -6,6 +6,7 @@ export class LevelMapping extends Model {
   public approvallevels!: number;
   public user_id!: string | null;
   public usergroup!: string | null;
+  public variable!: string | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 
@@ -34,6 +35,10 @@ export class LevelMapping extends Model {
         },
         usergroup: {
           type: DataTypes.STRING(30),
+          allowNull: true,
+        },
+        variable: {
+          type: DataTypes.CHAR(10),
           allowNull: true,
         },
       },

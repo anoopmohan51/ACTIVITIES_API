@@ -185,10 +185,10 @@ export class WorkflowController {
 
         // Validate each mapping
         for (const mapping of approvalLevel.levelMappings) {
-          if (!mapping.user_id && !mapping.user_group && !mapping.user_group_id) {
+          if (!mapping.user_id && !mapping.user_group && !mapping.user_group_id && !mapping.usergroup) {
             handleErrorResponse(res, {
               statusCode: 400,
-              message: 'Each mapping must have either user_id, user_group, or user_group_id'
+              message: 'Each mapping must have either user_id, user_group, user_group_id, or usergroup'
             });
             return;
           }

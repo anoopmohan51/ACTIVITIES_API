@@ -4,6 +4,7 @@ import { LevelMapping } from './LevelMapping';
 export class ApprovalLevels extends Model {
   public id!: number;
   public level!: number | null;
+  public type!: string | null;
   public company_id!: string | null;
   public created_user!: string | null;
   public updated_user!: string | null;
@@ -24,6 +25,10 @@ export class ApprovalLevels extends Model {
         },
         level: {
           type: DataTypes.INTEGER,
+          allowNull: true,
+        },
+        type: {
+          type: DataTypes.STRING(10),
           allowNull: true,
         },
         company_id: {

@@ -12,7 +12,7 @@ export class WorkflowService {
     const results = [];
 
     for (const approvalLevelData of workflowData) {
-      const { company_id, level, levelMappings, created_user, updated_user } = approvalLevelData;
+      const { company_id, level, type, levelMappings, created_user, updated_user } = approvalLevelData;
 
       // Check if approval level already exists for this company_id
       const existingApprovalLevel = await ApprovalLevels.findOne({
@@ -30,6 +30,7 @@ export class WorkflowService {
       const approvalLevel = await ApprovalLevels.create({
         company_id,
         level,
+        type: type || null,
         created_user: created_user || 'system',
         updated_user: updated_user || 'system',
         is_delete: false
@@ -42,7 +43,8 @@ export class WorkflowService {
           const levelMapping = await LevelMapping.create({
             approvallevels: approvalLevel.id,
             user_id: mapping.user_id?.toString() || null,
-            usergroup: mapping.user_group || mapping.user_group_id?.toString() || null
+            usergroup: mapping.usergroup?.toString() || null,
+            variable: mapping.variable || null
           });
           levelMappingsResult.push(levelMapping);
         }
@@ -115,7 +117,7 @@ export class WorkflowService {
 
     // Process each approval level in the payload
     for (const approvalLevelData of workflowData) {
-      const { id, level, levelMappings, company_id, ...otherFields } = approvalLevelData;
+      const { id, level, type, levelMappings, company_id, ...otherFields } = approvalLevelData;
       
       let approvalLevel: any;
       
@@ -124,6 +126,7 @@ export class WorkflowService {
         await ApprovalLevels.update(
           {
             level,
+            type: type || null,
             updated_user: 'system', // You might want to pass this from the request
             ...otherFields
           },
@@ -141,6 +144,7 @@ export class WorkflowService {
         // Create new approval level
         approvalLevel = await ApprovalLevels.create({
           level,
+          type: type || null,
           created_user: 'system', // You might want to pass this from the request
           updated_user: 'system',
           is_delete: false,
@@ -156,7 +160,7 @@ export class WorkflowService {
         const savedLevelMappingIds: number[] = [];
         
         for (const mapping of levelMappings) {
-          const { id: mappingId, workflow_id, user_id, user_group, user_group_id } = mapping;
+          const { id: mappingId, workflow_id, user_id, user_group, user_group_id, usergroup, variable } = mapping;
           
           let levelMapping: any;
           
@@ -165,7 +169,8 @@ export class WorkflowService {
             await LevelMapping.update(
               {
                 user_id: user_id?.toString() || null,
-                usergroup: user_group || user_group_id?.toString() || null
+                usergroup: usergroup?.toString() || null,
+                variable: variable || null
               },
               {
                 where: {
@@ -181,7 +186,8 @@ export class WorkflowService {
             levelMapping = await LevelMapping.create({
               approvallevels: approvalLevel.id,
               user_id: user_id?.toString() || null,
-              usergroup: user_group || user_group_id?.toString() || null
+              usergroup: usergroup?.toString() || null,
+              variable: variable || null
             });
           }
           
