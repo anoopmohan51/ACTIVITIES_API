@@ -5,6 +5,7 @@ import { Experience } from './Experience';
 import { ExperienceVideo } from './ExperienceVideo';
 import { ApprovalLevels } from './ApprovalLevels';
 import { LevelMapping } from './LevelMapping';
+import { ApprovalLogs } from './ApprovalLogs';
 
 export const db = {
   sequelize,
@@ -13,7 +14,8 @@ export const db = {
   Experience,
   ExperienceVideo,
   ApprovalLevels,
-  LevelMapping
+  LevelMapping,
+  ApprovalLogs
 };
 
 export default db;

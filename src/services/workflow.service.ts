@@ -221,8 +221,8 @@ export class WorkflowService {
       }
     }
 
-    // Delete approval levels not in the saved IDs for this company
-    // First, delete all level mappings for approval levels that will be deleted
+    // Soft delete approval levels not in the saved IDs for this company
+    // First, find all approval levels that will be soft deleted
     const approvalLevelsToDelete = await ApprovalLevels.findAll({
       where: {
         company_id: companyId,
@@ -233,7 +233,7 @@ export class WorkflowService {
       }
     });
 
-    // Delete level mappings for approval levels that will be deleted
+    // Delete level mappings for approval levels that will be soft deleted
     for (const approvalLevelToDelete of approvalLevelsToDelete) {
       await LevelMapping.destroy({
         where: {
@@ -242,16 +242,19 @@ export class WorkflowService {
       });
     }
 
-    // Now delete the approval levels
-    await ApprovalLevels.destroy({
-      where: {
-        company_id: companyId,
-        is_delete: false,
-        id: {
-          [require('sequelize').Op.notIn]: savedApprovalLevelIds
+    // Now soft delete the approval levels by setting is_delete to true
+    await ApprovalLevels.update(
+      { is_delete: true },
+      {
+        where: {
+          company_id: companyId,
+          is_delete: false,
+          id: {
+            [require('sequelize').Op.notIn]: savedApprovalLevelIds
+          }
         }
       }
-    });
+    );
 
     return results;
   }
@@ -273,7 +276,7 @@ export class WorkflowService {
     let deletedCount = 0;
 
     if (approvalLevelsToDelete.length > 0) {
-      // Delete all level mappings for these approval levels
+      // Soft delete all level mappings for these approval levels
       for (const approvalLevel of approvalLevelsToDelete) {
         await LevelMapping.destroy({
           where: {
@@ -282,13 +285,16 @@ export class WorkflowService {
         });
       }
 
-      // Delete all approval levels for this company
-      await ApprovalLevels.destroy({
-        where: {
-          company_id: companyId,
-          is_delete: false
+      // Soft delete all approval levels for this company by setting is_delete to true
+      await ApprovalLevels.update(
+        { is_delete: true },
+        {
+          where: {
+            company_id: companyId,
+            is_delete: false
+          }
         }
-      });
+      );
 
       deletedCount = approvalLevelsToDelete.length;
     }
