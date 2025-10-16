@@ -1,10 +1,14 @@
 import express, { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { Op } from 'sequelize';
 import { Experience } from '../models/Experience';
 import { Category } from '../models/Category';
 import { Season } from '../models/Season';
 import { ExperienceImage } from '../models/ExperienceImage';
+import { ApprovalLogs } from '../models/ApprovalLogs';
+import { ApprovalLevels } from '../models/ApprovalLevels';
+import { LevelMapping } from '../models/LevelMapping';
 import { handleErrorResponse, handleSuccessResponse } from '../utils/response.handler';
 import { handleVideoUpload } from '../utils/video.handler';
 import { handleImagesUpload } from '../utils/image.handler';
@@ -186,6 +190,24 @@ router.post('/', async (req, res) => {
 
         // Create the experience
         const experience = await Experience.create(experienceData);
+        
+        // Create approval log entry
+        try {
+            await ApprovalLogs.create({
+                experience_id: experience.id,
+                company_id: experienceData.company_id || null,
+                site_id: experienceData.site_id || null,
+                current_level: 0,
+                previous_level: null,
+                approved_by: null,
+                status: experienceData.status || 'draft',
+                action: 'created'
+            });
+            console.log('Approval log entry created for experience:', experience.id);
+        } catch (logError) {
+            console.error('Error creating approval log:', logError);
+            // Continue even if approval log creation fails
+        }
         
         // Initialize empty arrays for media URLs
         experience.imagesUrl = [];
@@ -812,95 +834,6 @@ router.get('/site/:siteId', async (req, res) => {
  * @route POST /api/experience/filter
  * @desc Filter experiences by status and category
  */
-/**
- * @route PATCH /api/experience/:id
- * @desc Update specific fields of an experience
- */
-router.patch('/:id', async (req, res) => {
-    try {
-        const experienceId = parseInt(req.params.id);
-        
-        // Find the experience
-        const experience = await Experience.findByPk(experienceId);
-        
-        if (!experience) {
-            return handleErrorResponse(res, {
-                statusCode: 404,
-                message: 'Experience not found',
-                errors: [{
-                    path: 'id',
-                    message: 'Experience with the provided ID does not exist'
-                }]
-            });
-        }
-
-        // Update only the fields that are provided in the request body
-        await experience.update(req.body);
-
-        // Get the updated experience with relations
-        const updatedExperience = await Experience.findByPk(experienceId, {
-            include: [
-                {
-                    model: Category,
-                    as: 'category',
-                    attributes: ['id', 'name']
-                },
-                {
-                    model: Season,
-                    as: 'season',
-                    attributes: ['id', 'name']
-                },
-                {
-                    model: ExperienceImage,
-                    as: 'images',
-                    attributes: ['id', 'path', 'name', 'uploaded_file_name']
-                }
-            ]
-        });
-
-        if (!updatedExperience) {
-            return handleErrorResponse(res, {
-                statusCode: 404,
-                message: 'Updated experience not found',
-                errors: [{
-                    path: 'id',
-                    message: 'Experience was updated but could not be retrieved'
-                }]
-            });
-        }
-
-        // Format response
-        const imageUrls = updatedExperience?.images?.map(img => img.path) || [];
-        const responseData = {
-            ...(updatedExperience?.toJSON() || {}),
-            videosUrl: updatedExperience.videosUrl || null,
-            imagesUrl: imageUrls,
-            category_name: (updatedExperience as any).category?.name || null,
-            season_name: (updatedExperience as any).season?.name || null,
-            // Remove nested relations
-            images: undefined,
-            category: undefined,
-            season: undefined
-        };
-
-        return handleSuccessResponse(res, {
-            message: 'Experience updated successfully',
-            data: responseData
-        });
-
-    } catch (error) {
-        console.error('Error updating experience:', error);
-        return handleErrorResponse(res, {
-            statusCode: 500,
-            message: error instanceof Error ? error.message : 'Internal server error',
-            errors: [{
-                path: 'server',
-                message: error instanceof Error ? error.message : 'An unexpected error occurred'
-            }]
-        });
-    }
-});
-
 router.post('/filter', async (req, res) => {
     try {
         // Get pagination from query params
@@ -1006,6 +939,382 @@ router.post('/filter', async (req, res) => {
 
     } catch (error) {
         console.error('Error filtering experiences:', error);
+        return handleErrorResponse(res, {
+            statusCode: 500,
+            message: error instanceof Error ? error.message : 'Internal server error',
+            errors: [{
+                path: 'server',
+                message: error instanceof Error ? error.message : 'An unexpected error occurred'
+            }]
+        });
+    }
+});
+
+/**
+ * @route PATCH /api/experience/:id/approve
+ * @desc Update experience approval status
+ */
+router.patch('/:id', async (req, res) => {
+    try {
+        const experienceId = parseInt(req.params.id);
+        const { status, approved_by, reason_for_reject } = req.body;
+
+        // Validate required fields
+        if (!status) {
+            return handleErrorResponse(res, {
+                statusCode: 400,
+                message: 'Status is required',
+                errors: [{
+                    path: 'status',
+                    message: 'Status field is required'
+                }]
+            });
+        }
+
+        if (!approved_by) {
+            return handleErrorResponse(res, {
+                statusCode: 400,
+                message: 'Approved by (user_id) is required',
+                errors: [{
+                    path: 'approved_by',
+                    message: 'approved_by field is required'
+                }]
+            });
+        }
+
+        // Find the experience
+        const experience = await Experience.findByPk(experienceId);
+
+        if (!experience) {
+            return handleErrorResponse(res, {
+                statusCode: 404,
+                message: 'Experience not found',
+                errors: [{
+                    path: 'id',
+                    message: 'Experience with the provided ID does not exist'
+                }]
+            });
+        }
+
+        // Store previous level
+        const previousLevel = experience.current_approval_level || 0;
+        let newApprovalLevel = previousLevel+1;
+
+        // Get the next approval level from approval_levels table
+        const approvalLevel = await ApprovalLevels.findOne({
+            where: {
+                company_id: experience.company_id,
+                is_delete: false,
+                level:newApprovalLevel
+            },
+            order: [['level', 'ASC']]
+        });
+
+        if (!approvalLevel) {
+            return handleErrorResponse(res, {
+                statusCode: 404,
+                message: 'No approval levels configured for this company',
+                errors: [{
+                    path: 'approval_levels',
+                    message: 'Approval levels not found for this company'
+                }]
+            });
+        }
+
+        // Determine the new approval level based on status
+        
+        let action = 'submitted';
+
+        if (status === 'rejected') {
+                action = 'rejected';
+                newApprovalLevel=0;
+            }
+
+        // Update experience with new status and approval level
+        await experience.update({
+            status: status,
+            current_approval_level: newApprovalLevel,
+        });
+
+        // Create approval log entry
+        await ApprovalLogs.create({
+            experience_id: experienceId,
+            company_id: experience.company_id,
+            site_id: experience.site_id,
+            current_level: newApprovalLevel,
+            previous_level: previousLevel,
+            approved_by: approved_by,
+            status: status,
+            action: action,
+            reason_for_reject: status === 'rejected' ? reason_for_reject : null
+        });
+
+        // Get updated experience with relations
+        const updatedExperience = await Experience.findByPk(experienceId, {
+            include: [
+                {
+                    model: Category,
+                    as: 'category',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: Season,
+                    as: 'season',
+                    attributes: ['id', 'name']
+                }
+            ]
+        });
+
+        return handleSuccessResponse(res, {
+            message: `Experience ${action} successfully`,
+            data: {
+                id: experienceId,
+                status: status,
+                current_approval_level: newApprovalLevel,
+                previous_level: previousLevel,
+                experience: updatedExperience
+            }
+        });
+
+    } catch (error) {
+        console.error('Error updating experience approval status:', error);
+        return handleErrorResponse(res, {
+            statusCode: 500,
+            message: error instanceof Error ? error.message : 'Internal server error',
+            errors: [{
+                path: 'server',
+                message: error instanceof Error ? error.message : 'An unexpected error occurred'
+            }]
+        });
+    }
+});
+
+/**
+ * @route POST /api/experience/approval/filter
+ * @desc Filter experiences for approval based on user levels
+ */
+router.post('/approval/filter', async (req, res) => {
+    try {
+        // Get pagination from query params
+        const limit = parseInt(req.query.limit as string) || 10;  // Default limit to 10
+        const offset = parseInt(req.query.offset as string) || 0; // Default offset to 0
+        
+        const { user_id, usergroup, filter } = req.body;
+
+        // Validate required fields
+        const hasValidUsergroup = usergroup && (Array.isArray(usergroup) ? usergroup.length > 0 : true);
+        
+        if (!user_id && !hasValidUsergroup) {
+            return handleErrorResponse(res, {
+                statusCode: 400,
+                message: 'Either user_id or usergroup is required',
+                errors: [{
+                    path: 'user_id/usergroup',
+                    message: 'At least one identifier is required'
+                }]
+            });
+        }
+
+        // Build where clause for level mappings using OR logic
+        const levelMappingWhere: any = {};
+        const orConditions: any[] = [];
+        
+        if (user_id) {
+            orConditions.push({ user_id: user_id });
+        }
+        
+        if (hasValidUsergroup) {
+            // Handle both single usergroup and array of usergroups
+            if (Array.isArray(usergroup)) {
+                orConditions.push({ usergroup: { [Op.in]: usergroup } });
+            } else {
+                orConditions.push({ usergroup: usergroup });
+            }
+        }
+
+        // Apply OR conditions if multiple criteria exist
+        if (orConditions.length > 1) {
+            levelMappingWhere[Op.or] = orConditions;
+        } else if (orConditions.length === 1) {
+            Object.assign(levelMappingWhere, orConditions[0]);
+        }
+
+        // Find level mappings for the user/group
+        const levelMappings = await LevelMapping.findAll({
+            where: levelMappingWhere,
+            include: [{
+                model: ApprovalLevels,
+                as: 'approvalLevel',
+                where: { is_delete: false },
+                required: true
+            }]
+        });
+
+        if (!levelMappings || levelMappings.length === 0) {
+            return handleSuccessResponse(res, {
+                message: 'No approval levels found for this user/group',
+                data: {
+                    experiences: [],
+                    user_levels: [],
+                    pagination: {
+                        total: 0,
+                        totalPages: 0,
+                        currentPage: 1,
+                        limit: Number(limit),
+                        offset: Number(offset)
+                    }
+                }
+            });
+        }
+
+        // Extract levels from the mappings
+        const userLevels = levelMappings.map(mapping => 
+            (mapping.approvalLevel as any)?.level
+        ).filter(level => level !== undefined && level !== null);
+
+        if (userLevels.length === 0) {
+            return handleSuccessResponse(res, {
+                message: 'No valid approval levels found',
+                data: {
+                    experiences: [],
+                    user_levels: [],
+                    pagination: {
+                        total: 0,
+                        totalPages: 0,
+                        currentPage: 1,
+                        limit: Number(limit),
+                        offset: Number(offset)
+                    }
+                }
+            });
+        }
+
+        // Build where clause for experiences
+        const experienceWhere: any = {
+            is_delete: false,
+            current_approval_level: userLevels // Filter by user's approval levels
+        };
+
+        // Add additional filters from request
+        if (filter) {
+            if (filter.categoryId) {
+                experienceWhere.categoryId = filter.categoryId;
+            }
+            if (filter.company_id) {
+                experienceWhere.company_id = filter.company_id;
+            }
+            if (filter.site_id) {
+                experienceWhere.site_id = filter.site_id;
+            }
+        }
+
+        // Fetch experiences matching the criteria with pagination
+        const { count, rows: experiences } = await Experience.findAndCountAll({
+            where: experienceWhere,
+            limit: Number(limit),
+            offset: Number(offset),
+            include: [
+                {
+                    model: Category,
+                    as: 'category',
+                    attributes: ['id', 'name'],
+                    required: false
+                },
+                {
+                    model: Season,
+                    as: 'season',
+                    attributes: ['id', 'name'],
+                    required: false
+                },
+                {
+                    model: ExperienceImage,
+                    as: 'images',
+                    attributes: ['id', 'path', 'name', 'uploaded_file_name']
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
+        // Check if no experiences found
+        if (!experiences || experiences.length === 0) {
+            return handleSuccessResponse(res, {
+                message: 'No experiences found for approval',
+                data: {
+                    experiences: [],
+                    user_levels: userLevels,
+                    pagination: {
+                        total: 0,
+                        totalPages: 0,
+                        currentPage: Math.floor(offset / limit) + 1,
+                        limit: Number(limit),
+                        offset: Number(offset)
+                    }
+                }
+            });
+        }
+
+        // Get the maximum approval level from the company_id in filter
+        let maxApprovalLevel: number | null = null;
+        
+        if (filter?.company_id) {
+            const maxLevelRecord = await ApprovalLevels.findOne({
+                where: {
+                    company_id: filter.company_id,
+                    is_delete: false
+                },
+                order: [['level', 'DESC']],
+                attributes: ['level']
+            });
+            
+            if (maxLevelRecord && maxLevelRecord.level !== null) {
+                maxApprovalLevel = maxLevelRecord.level;
+            }
+        }
+
+        // Format experiences using common response structure
+        const formattedExperiences = experiences.map(experience => {
+            const imageUrls = experience.images?.map(img => img.path) || [];
+            
+            // Determine if this experience is at final approval level
+            const isFinalLevel = maxApprovalLevel !== null 
+                ? experience.current_approval_level === maxApprovalLevel 
+                : false;
+
+            return {
+                ...experience.toJSON(),
+                videosUrl: experience.videosUrl || null,
+                imagesUrl: imageUrls,
+                category_name: (experience as any).category?.name || null,
+                season_name: (experience as any).season?.name || null,
+                is_final_level: isFinalLevel,
+                // Remove nested relations from the response
+                images: undefined,
+                category: undefined,
+                season: undefined
+            };
+        });
+
+        // Calculate pagination metadata
+        const totalPages = Math.ceil(count / limit);
+        const currentPage = Math.floor(offset / limit) + 1;
+
+        return handleSuccessResponse(res, {
+            message: 'Experiences retrieved successfully',
+            data: {
+                experiences: formattedExperiences,
+                user_levels: userLevels,
+                pagination: {
+                    total: count,
+                    totalPages,
+                    currentPage,
+                    limit: Number(limit),
+                    offset: Number(offset)
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Error filtering experiences for approval:', error);
         return handleErrorResponse(res, {
             statusCode: 500,
             message: error instanceof Error ? error.message : 'Internal server error',

@@ -3,12 +3,16 @@ import { Experience } from './Experience';
 
 export class ApprovalLogs extends Model {
   public id!: number;
-  public user_id!: string | null;
   public experience_id!: number | null;
   public company_id!: string | null;
   public site_id!: string | null;
+  public current_level!: number | null;
+  public previous_level!: number | null;
+  public approved_by!: string | null;
+  public status!: string | null;
+  public action!: string | null;
+  public reason_for_reject!: string | null;
   public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
 
   // Association
   public experience?: Experience;
@@ -20,10 +24,6 @@ export class ApprovalLogs extends Model {
           type: DataTypes.INTEGER,
           autoIncrement: true,
           primaryKey: true,
-        },
-        user_id: {
-          type: DataTypes.STRING(30),
-          allowNull: true,
         },
         experience_id: {
           type: DataTypes.INTEGER,
@@ -41,11 +41,36 @@ export class ApprovalLogs extends Model {
           type: DataTypes.STRING(30),
           allowNull: true,
         },
+        current_level: {
+          type: DataTypes.INTEGER,
+          allowNull: true,
+        },
+        previous_level: {
+          type: DataTypes.INTEGER,
+          allowNull: true,
+        },
+        approved_by: {
+          type: DataTypes.STRING(30),
+          allowNull: true,
+        },
+        status: {
+          type: DataTypes.STRING(50),
+          allowNull: true,
+        },
+        action: {
+          type: DataTypes.STRING(50),
+          allowNull: true,
+        },
+        reason_for_reject: {
+          type: DataTypes.TEXT,
+          allowNull: true,
+        },
       },
       {
         sequelize,
         tableName: 'approval_logs',
-        timestamps: true, // This enables createdAt and updatedAt
+        timestamps: true,
+        updatedAt: false, // Disable updatedAt, keep only createdAt
       }
     );
     return this;
