@@ -841,7 +841,7 @@ router.post('/filter', async (req, res) => {
         const offset = parseInt(req.query.offset as string) || 0; // Default offset to 0
         
         // Get filters from request body
-        const { status, categoryId ,site_id,company_id} = req.body;
+        const { status, categoryId ,site_id,company_id,current_approval_level} = req.body;
         // Build where clause
         const whereClause: any = {
             is_delete: false, // Always exclude deleted records
@@ -862,6 +862,9 @@ router.post('/filter', async (req, res) => {
         }
         if (company_id) {
             whereClause.company_id = company_id;
+        }
+        if (current_approval_level) {
+            whereClause.current_approval_level = current_approval_level;
         }
         // Fetch filtered experiences with their relations and total count
         const { count, rows: experiences } = await Experience.findAndCountAll({
@@ -998,37 +1001,46 @@ router.patch('/:id', async (req, res) => {
 
         // Store previous level
         const previousLevel = experience.current_approval_level || 0;
-        let newApprovalLevel = previousLevel+1;
-
-        // Get the next approval level from approval_levels table
-        const approvalLevel = await ApprovalLevels.findOne({
-            where: {
-                company_id: experience.company_id,
-                is_delete: false,
-                level:newApprovalLevel
-            },
-            order: [['level', 'ASC']]
-        });
-
-        if (!approvalLevel) {
-            return handleErrorResponse(res, {
-                statusCode: 404,
-                message: 'No approval levels configured for this company',
-                errors: [{
-                    path: 'approval_levels',
-                    message: 'Approval levels not found for this company'
-                }]
-            });
-        }
-
-        // Determine the new approval level based on status
-        
+        let newApprovalLevel = previousLevel;
         let action = 'submitted';
 
-        if (status === 'rejected') {
-                action = 'rejected';
-                newApprovalLevel=0;
+        // Only increment approval level if status is not 'published'
+        if (status !== 'published') {
+            newApprovalLevel = previousLevel + 1;
+            
+            // Get the next approval level from approval_levels table
+            const approvalLevel = await ApprovalLevels.findOne({
+                where: {
+                    company_id: experience.company_id,
+                    is_delete: false,
+                    level: newApprovalLevel
+                },
+                order: [['level', 'ASC']]
+            });
+
+            if (!approvalLevel && status !== 'rejected') {
+                return handleErrorResponse(res, {
+                    statusCode: 404,
+                    message: 'No approval levels configured for this company',
+                    errors: [{
+                        path: 'approval_levels',
+                        message: 'Approval levels not found for this company'
+                    }]
+                });
             }
+        }
+
+        // Determine the action based on status
+        if (status === 'rejected') {
+            action = 'rejected';
+            newApprovalLevel = 0;
+        } else if (status === 'published') {
+            action = 'published';
+            // Keep current level when published
+            newApprovalLevel = previousLevel;
+        } else if (status === 'approved') {
+            action = 'approved';
+        }
 
         // Update experience with new status and approval level
         await experience.update({
@@ -1192,7 +1204,8 @@ router.post('/approval/filter', async (req, res) => {
         // Build where clause for experiences
         const experienceWhere: any = {
             is_delete: false,
-            current_approval_level: userLevels // Filter by user's approval levels
+            current_approval_level: userLevels, // Filter by user's approval levels
+            status: { [Op.ne]: 'published' } // Exclude published experiences
         };
 
         // Add additional filters from request
@@ -1315,6 +1328,62 @@ router.post('/approval/filter', async (req, res) => {
 
     } catch (error) {
         console.error('Error filtering experiences for approval:', error);
+        return handleErrorResponse(res, {
+            statusCode: 500,
+            message: error instanceof Error ? error.message : 'Internal server error',
+            errors: [{
+                path: 'server',
+                message: error instanceof Error ? error.message : 'An unexpected error occurred'
+            }]
+        });
+    }
+});
+
+/**
+ * @route GET /api/experience/approval_level/:company_id
+ * @desc Get count of approval levels for a company
+ */
+router.get('/approval_level/:company_id', async (req, res) => {
+    try {
+        const { company_id } = req.params;
+        // Validate required parameter
+        if (!company_id) {
+            return handleErrorResponse(res, {
+                statusCode: 400,
+                message: 'Company ID is required',
+                errors: [{
+                    path: 'company_id',
+                    message: 'company_id parameter is required'
+                }]
+            });
+        }
+
+        // Get count of approval levels for this company
+        const count = await ApprovalLevels.count({
+            where: {
+                company_id: company_id,
+                is_delete: false
+            }
+        });
+
+        // Also get the max level number
+        const maxLevel = await ApprovalLevels.max('level', {
+            where: {
+                company_id: company_id,
+                is_delete: false
+            }
+        }) as number | null;
+        return handleSuccessResponse(res, {
+            message: 'Approval levels count retrieved successfully',
+            data: {
+                company_id: company_id,
+                total_levels: count,
+                max_level: maxLevel || 0,
+            }
+        });
+
+    } catch (error) {
+        console.error('Error getting approval levels count:', error);
         return handleErrorResponse(res, {
             statusCode: 500,
             message: error instanceof Error ? error.message : 'Internal server error',

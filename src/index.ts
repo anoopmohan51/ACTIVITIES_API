@@ -255,6 +255,7 @@ console.log('\nExperience Routes:');
 console.log(`POST ${experienceBasePath}`);
 console.log(`PUT ${experienceBasePath}/:id`);
 console.log(`GET ${experienceBasePath}/site/:siteId`);
+console.log(`GET ${experienceBasePath}/approval_level/:company_id`);
 
 console.log('\nWorkflow Routes:');
 console.log(`POST ${workflowBasePath}`);
