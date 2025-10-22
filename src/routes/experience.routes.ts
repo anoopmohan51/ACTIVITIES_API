@@ -15,20 +15,6 @@ import { handleImagesUpload } from '../utils/image.handler';
 
 const router: Router = express.Router();
 
-// Debug: Log when router is created
-console.log('\n=== Experience Router Initialization ===');
-console.log('Creating experience router');
-
-// Debug middleware for all experience routes
-router.use((req, res, next) => {
-    console.log('\n=== Experience Route Debug ===');
-    console.log('Method:', req.method);
-    console.log('Path:', req.path);
-    console.log('Full URL:', req.originalUrl);
-    console.log('Params:', req.params);
-    next();
-});
-
 
 interface ErrorResponse {
     statusCode?: number;
@@ -55,39 +41,10 @@ interface ExperienceWithRelations extends Omit<Experience, 'category' | 'season'
 router.post('/', async (req, res) => {
     try {
         // Debug logging for form-data
-        console.log('\n=== Form Data Details ===');
-        console.log('Content-Type:', req.headers['content-type']);
         // No file handling in this route
         
         // Get form data
         const formData: Record<string, any> = req.body;
-        
-        // Print form fields in a structured way
-        console.log('\nReceived Form Fields:');
-        console.log('---------------------');
-        console.log('Required Fields:');
-        console.log('- company_id:', formData.company_id);
-        console.log('- site_id:', formData.site_id);
-        console.log('- created_user:', formData.created_user);
-        console.log('- updated_user:', formData.updated_user);
-        console.log('- is_delete:', formData.is_delete);
-        
-        console.log('\nGuide Fields:');
-        console.log('- isGuided:', formData.isGuided);
-        console.log('- guideType:', formData.guideType);
-        console.log('- noOfGuides:', formData.noOfGuides);
-        
-        console.log('\nMedia Fields:');
-        console.log('- video:', formData.video || 'Not provided');
-        console.log('- imagesUrl:', formData.images || 'Not provided');
-        
-        console.log('\nAdditional Fields:');
-        console.log('- additionalInformation:', formData.additionalInformation);
-        console.log('- termsAndConditions:', formData.termsAndConditions);
-        console.log('- costBreakdown:', formData.costBreakdown);
-        console.log('- billingInstructions:', formData.billingInstructions);
-        
-        console.log('\n=====================');
         
         // Check if form data exists
         if (!req.body || Object.keys(req.body).length === 0) {
@@ -100,22 +57,6 @@ router.post('/', async (req, res) => {
                 }]
             });
         }
-        
-        // Log raw request body
-        console.log('Raw request body:', req.body);
-        console.log('Content-Type:', req.headers['content-type']);
-
-        // Log individual field values for debugging
-        console.log('=== Form Field Values ===');
-        console.log('site_id:', formData.site_id);
-        console.log('name:', formData.name);
-        console.log('additionalInformation:', formData.additionalInformation);
-        console.log('termsAndConditions:', formData.termsAndConditions);
-        console.log('costBreakdown:', formData.costBreakdown);
-        console.log('billingInstructions:', formData.billingInstructions);
-        console.log('company_id:', formData.company_id);
-        console.log('created_user:', formData.created_user);
-        console.log('=====================');
 
         // Create the experience object from form-data
         const experienceData = {
@@ -174,7 +115,6 @@ router.post('/', async (req, res) => {
         };
         
 
-        console.log('Experience data:', experienceData);
 
         // Validate required fields
         if (!experienceData.site_id) {
@@ -203,7 +143,6 @@ router.post('/', async (req, res) => {
                 status: experienceData.status || 'draft',
                 action: 'created'
             });
-            console.log('Approval log entry created for experience:', experience.id);
         } catch (logError) {
             console.error('Error creating approval log:', logError);
             // Continue even if approval log creation fails
@@ -213,20 +152,6 @@ router.post('/', async (req, res) => {
         experience.imagesUrl = [];
         experience.videosUrl = null as any;
 
-        // Debug file uploads
-        console.log('\n=== File Upload Debug ===');
-        console.log('req.files:', JSON.stringify(req.files, null, 2));
-        console.log('req.files type:', typeof req.files);
-        if (req.files) {
-            console.log('Available file fields:', Object.keys(req.files));
-            if ((req.files as any).images) {
-                console.log('Number of images:', (req.files as any).images.length);
-                console.log('Image details:', JSON.stringify((req.files as any).images, null, 2));
-            } else {
-                console.log('No images field found in request');
-            }
-        }
-        console.log('======================\n');
 
         // Handle file uploads if provided
         if (req.files) {
@@ -246,28 +171,15 @@ router.post('/', async (req, res) => {
                 }
             }
 
-            // Handle images upload
-            console.log('\n=== Image Upload Debug ===');
-            console.log('Checking for images in files:', files);
-            if (files.images) {
-                console.log('Found images array:', files.images);
-                console.log('Number of images:', files.images.length);
-            } else {
-                console.log('No images found in request');
-            }
-            console.log('======================\n');
 
             if (files.images && files.images.length > 0) {
                 try {
-                    console.log('Attempting to upload', files.images.length, 'images');
                     const imageRecords = await handleImagesUpload(files.images, experience.id);
-                    console.log('Successfully uploaded images:', imageRecords);
                     
                     // Get image paths and update experience
                     const imagePaths = imageRecords.map(record => record.path);
                     await experience.update({ imagesUrl: imagePaths });
                     experience.imagesUrl = imagePaths; // Update the instance for response
-                    console.log('Updated experience with image paths');
                 } catch (uploadError) {
                     console.error('Error handling images upload:', uploadError);
                     console.error('Error details:', JSON.stringify(uploadError, null, 2));
@@ -440,7 +352,6 @@ router.delete('/:id', async (req, res) => {
             updated_user: experience.updated_user, // Preserve the last updated user
             updatedAt: new Date() // Update the timestamp
         });
-        console.log(`Soft deleted experience with ID: ${experienceId}`);
 
         return handleSuccessResponse(res, {
             message: 'Experience deleted successfully',
@@ -468,28 +379,12 @@ router.delete('/:id', async (req, res) => {
  * @desc Update an experience
  */
 router.put('/:id', async (req, res) => {
-    console.log('\n=== PUT Experience Handler ===');
-    console.log('Handler triggered for PUT /:id');
-    console.log('ID parameter:', req.params.id);
-    console.log('Full URL:', req.originalUrl);
-    console.log('Content-Type:', req.headers['content-type']);
-    console.log('PUT route handler called');
-    console.log('Request params:', req.params);
-    console.log('Request path:', req.path);
     try {
-        console.log('\n=== Experience Edit Debug ===');
-        console.log('Request Method:', req.method);
-        console.log('Request Path:', req.path);
-        console.log('Content-Type:', req.headers['content-type']);
-        console.log('Request Body:', req.body);
-        console.log('Request Files:', req.files);
         
         const experienceId = parseInt(req.params.id);
-        console.log('Experience ID:', experienceId);
         
         // Find the experience
         const experience = await Experience.findByPk(experienceId);
-        console.log('Found Experience:', experience?.toJSON());
         if (!experience) {
             return handleErrorResponse(res, {
                 statusCode: 404,
@@ -504,8 +399,6 @@ router.put('/:id', async (req, res) => {
         // Get form data
         const formData: Record<string, any> = req.body;
         
-        // Log the form data we're about to use for update
-        console.log('\nUpdate Data:', formData);
         
         // Create the experience object from form-data
         const experienceData = {
@@ -566,7 +459,6 @@ router.put('/:id', async (req, res) => {
             department_id: formData.department_id || experience.department_id,
         };
 
-        console.log('\nProcessed Update Data:', experienceData);
 
         // Update basic fields
         await experience.update(experienceData);
@@ -575,10 +467,6 @@ router.put('/:id', async (req, res) => {
         if (req.files) {
             const files = req.files as { [fieldname: string]: Express.Multer.File[] };
             
-            // Handle video upload or removal
-            console.log('\nChecking for video changes...');
-            console.log('Form data video:', formData.video);
-            console.log('Files video:', files.video);
 
             // Check if video field exists and is empty or invalid
             const shouldRemoveVideo = ('video' in formData) && 
@@ -586,23 +474,19 @@ router.put('/:id', async (req, res) => {
 
             if (shouldRemoveVideo) {
                 // Remove existing video
-                console.log('Video field is empty or invalid, removing existing video');
                 try {
                     await handleVideoUpload(null, experience.id);
                     await experience.update({ videosUrl: '' });
                     experience.videosUrl = ''; // Update the instance for response
-                    console.log('Video removed successfully');
                 } catch (removeError) {
                     console.error('Error removing video:', removeError);
                     console.error('Error details:', removeError instanceof Error ? removeError.message : removeError);
                 }
             } else if (files.video && files.video[0]) {
                 // Upload new video
-                console.log('Valid video file found:', files.video[0].originalname);
                 try {
                     const videoRecord = await handleVideoUpload(files.video[0], experience.id);
                     if (videoRecord) {
-                        console.log('Video upload successful:', videoRecord);
                         await experience.update({ videosUrl: videoRecord.path });
                         experience.videosUrl = videoRecord.path; // Update the instance for response
                     }
@@ -611,25 +495,19 @@ router.put('/:id', async (req, res) => {
                     console.error('Error details:', uploadError instanceof Error ? uploadError.message : uploadError);
                 }
             } else {
-                console.log('No video changes requested');
             }
 
-            // Handle images upload or removal
-            console.log('\nChecking for image updates...');
             
             // Get existing images first
             let currentImages = await ExperienceImage.findAll({
                 where: { experience_id: experience.id }
             });
-            console.log('Current images:', currentImages.map(img => img.toJSON()));
 
             // Check if we should remove images
             if (formData.removeImages === 'true') {
-                console.log('Removing all images as requested');
                 try {
                     await handleImagesUpload(null, experience.id);
                     currentImages = [];
-                    console.log('All images removed successfully');
                 } catch (removeError) {
                     console.error('Error removing images:', removeError);
                 }
@@ -640,36 +518,27 @@ router.put('/:id', async (req, res) => {
                 
                 // Check if we have valid images in the request
                 if (files.images && files.images.length > 0) {
-                    console.log('Found', files.images.length, 'images in request');
                     
                     // Filter out invalid images (like /path/to/file)
                     const validImages = files.images.filter(img => {
                         const isValid = img.originalname !== 'file' && img.size > 0;
                         if (!isValid) {
-                            console.log(`Skipping invalid image: ${img.originalname}`);
                         }
                         return isValid;
                     });
 
                     if (validImages.length > 0) {
-                        console.log('Processing', validImages.length, 'valid images');
-                        validImages.forEach((img, idx) => {
-                            console.log(`Image ${idx + 1}:`, img.originalname);
-                        });
                         imagesToProcess = validImages;
                     } else {
-                        console.log('No valid images to process, removing existing images');
                         imagesToProcess = null;
                     }
                 } else {
-                    console.log('No images in request, removing existing images');
                     imagesToProcess = null;
                 }
 
                 try {
                     // Process images or remove existing ones if no valid images
                     const imageRecords = await handleImagesUpload(imagesToProcess, experience.id);
-                    console.log('Image handling successful:', imageRecords);
                     
                     // Update current images
                     currentImages = imageRecords;
@@ -680,7 +549,6 @@ router.put('/:id', async (req, res) => {
             
             // Update experience with current image paths
             const imagePaths = currentImages.map(img => img.path);
-            console.log('Final image paths:', imagePaths);
             await experience.update({ imagesUrl: imagePaths });
             experience.imagesUrl = imagePaths;
         }
@@ -690,7 +558,6 @@ router.put('/:id', async (req, res) => {
             where: { experience_id: experienceId }
         });
         const imageUrls = latestImages.map(img => img.path);
-        console.log('Latest image URLs:', imageUrls);
 
         // Get category and season data
         const updatedExperience = await Experience.findByPk(experienceId, {
@@ -714,7 +581,6 @@ router.put('/:id', async (req, res) => {
 
         // Get the current video URL
         const videoUrl = updatedExperience.videosUrl;
-        console.log('Current video URL:', videoUrl);
 
         // Prepare response data with the latest media URLs and flatten category/season
         const experienceJson = updatedExperience.toJSON();
@@ -730,7 +596,6 @@ router.put('/:id', async (req, res) => {
             season: undefined
         };
 
-        console.log('Response data:', responseData);
 
         return handleSuccessResponse(res, {
             message: 'Experience updated successfully',
@@ -984,10 +849,10 @@ router.patch('/:id', async (req, res) => {
                 }]
             });
         }
-
+        
         // Find the experience
         const experience = await Experience.findByPk(experienceId);
-
+        
         if (!experience) {
             return handleErrorResponse(res, {
                 statusCode: 404,
@@ -1287,7 +1152,7 @@ router.post('/approval/filter', async (req, res) => {
         // Format experiences using common response structure
         const formattedExperiences = experiences.map(experience => {
             const imageUrls = experience.images?.map(img => img.path) || [];
-            
+
             // Determine if this experience is at final approval level
             const isFinalLevel = maxApprovalLevel !== null 
                 ? experience.current_approval_level === maxApprovalLevel 

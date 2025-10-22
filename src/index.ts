@@ -45,15 +45,9 @@ const storage = multer.diskStorage({
             }
         }
 
-        console.log('Multer destination debug:', {
-            method: req.method,
-            url: req.originalUrl,
-            experience_id
-        });
 
         const type = file.fieldname === 'video' ? 'videos' : 'images';
         const dir = path.join('/app', type, experience_id);
-        console.log(`Creating directory: ${dir}`);
         
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
@@ -73,11 +67,6 @@ const storage = multer.diskStorage({
             }
         }
 
-        console.log('Multer filename debug:', {
-            method: req.method,
-            url: req.originalUrl,
-            experience_id
-        });
 
         cb(null, `${experience_id}_${timestamp}${ext}`);
     }
@@ -89,12 +78,6 @@ const upload = multer({
         fileSize: 100 * 1024 * 1024, // 100MB limit
     },
     fileFilter: (req: any, file: any, cb: any) => {
-        console.log('\n=== Multer File Filter ===');
-        console.log('Received file:', {
-            fieldname: file.fieldname,
-            originalname: file.originalname,
-            mimetype: file.mimetype
-        });
         
         // Accept video and images
         if (file.fieldname === 'video' || file.fieldname === 'images') {
@@ -106,13 +89,10 @@ const upload = multer({
                 cb(new Error('Only image files are allowed for image upload'));
                 return;
             }
-            console.log('Accepting file:', file.fieldname);
             cb(null, true);
         } else {
-            console.log('Rejecting file:', file.fieldname);
             cb(null, false);
         }
-        console.log('======================\n');
     }
 });
 
@@ -124,15 +104,9 @@ const fileUpload = upload.fields([
 
 // Handle multipart form data for both POST and PUT
 app.use((req, res, next) => {
-    console.log('\n=== Multer Middleware Debug ===');
-    console.log('Method:', req.method);
-    console.log('Path:', req.path);
-    console.log('Content-Type:', req.headers['content-type']);
-    console.log('Is multipart?', req.is('multipart/form-data'));
     
     // Process multipart form data for both POST and PUT requests
     if ((req.method === 'POST' || req.method === 'PUT') && req.is('multipart/form-data')) {
-        console.log('Processing multipart form data...');
         fileUpload(req, res, (err: any) => {
             if (err) {
                 console.error('Multer error:', err);
@@ -142,47 +116,15 @@ app.use((req, res, next) => {
                     error: err.message
                 });
             }
-            console.log('Multer processed files:', req.files);
             next();
         });
     } else {
-        console.log('Not a multipart request or not POST/PUT, skipping multer');
         next();
     }
-    console.log('======================\n');
 });
 
-// Debug middleware to log request details
-app.use((req, res, next) => {
-    console.log('\n=== Request Debug ===');
-    console.log('Method:', req.method);
-    console.log('Path:', req.path);
-    console.log('Content-Type:', req.headers['content-type']);
-    console.log('Body:', req.body);
-    console.log('===================\n');
-    next();
-});
 
-// Debug middleware to log raw request
-app.use((req, res, next) => {
-  if (req.method === 'POST' || req.method === 'PUT') {
-    console.log('\n=== Raw Request ===');
-    console.log('Content-Type:', req.headers['content-type']);
-    console.log('Raw Body:', req.body);
-    console.log('=================\n');
-  }
-  next();
-});
 
-// Request logging middleware
-app.use((req, res, next) => {
-  console.log('\n=== Incoming Request ===');
-  console.log('Method:', req.method);
-  console.log('URL:', req.originalUrl);
-  console.log('Body:', req.body);
-  console.log('=====================\n');
-  next();
-});
 
 // Root route
 app.get('/', (req, res) => {
@@ -191,13 +133,7 @@ app.get('/', (req, res) => {
 
 // Season routes with explicit path
 const seasonBasePath = '/api/seasons';
-console.log(`Registering season routes at ${seasonBasePath}`);
 
-// Debug middleware for season routes
-app.use(seasonBasePath, (req, res, next) => {
-  console.log(`Season route hit: ${req.method} ${req.path}`);
-  next();
-});
 
 app.use(seasonBasePath, seasonRoutes);
 
@@ -215,59 +151,11 @@ app.use(experienceBasePath, experienceRoutes);
 const workflowBasePath = '/api/workflow';
 app.use(workflowBasePath, workflowRoutes);
 
-console.log('\n=== Route Registration Debug ===');
-console.log('Experience base path:', experienceBasePath);
-console.log('Available routes:');
-console.log('- POST /api/experience');
-console.log('- PUT /api/experience/:id');
-console.log('- GET /api/experience/site/:siteId');
 
-// Add route debugging middleware
-app.use('*', (req, res, next) => {
-  console.log('\n=== Request Debug ===');
-  console.log('Method:', req.method);
-  console.log('Original URL:', req.originalUrl);
-  console.log('Base URL:', req.baseUrl);
-  console.log('Path:', req.path);
-  console.log('Route found:', req.route ? 'Yes' : 'No');
-  next();
-});
 
-// Log all registered routes
-console.log('\n=== Registered Routes ===');
-console.log('Season Routes:');
-console.log(`POST ${seasonBasePath}`);
-console.log(`POST ${seasonBasePath}/filter`);
-console.log(`GET ${seasonBasePath}/site/:siteId`);
-console.log(`GET ${seasonBasePath}/:id`);
-console.log(`PUT ${seasonBasePath}/:id`);
-console.log(`DELETE ${seasonBasePath}/:id`);
-
-console.log('\nCategory Routes:');
-console.log(`POST ${categoryBasePath}`);
-console.log(`POST ${categoryBasePath}/filter`);
-console.log(`GET ${categoryBasePath}/site/:siteId`);
-console.log(`GET ${categoryBasePath}/:id`);
-console.log(`PUT ${categoryBasePath}/:id`);
-console.log(`DELETE ${categoryBasePath}/:id`);
-
-console.log('\nExperience Routes:');
-console.log(`POST ${experienceBasePath}`);
-console.log(`PUT ${experienceBasePath}/:id`);
-console.log(`GET ${experienceBasePath}/site/:siteId`);
-console.log(`GET ${experienceBasePath}/approval_level/:company_id`);
-
-console.log('\nWorkflow Routes:');
-console.log(`POST ${workflowBasePath}`);
-console.log(`GET ${workflowBasePath}/company/:companyId`);
-console.log(`PUT ${workflowBasePath}/company/:companyId`);
-console.log(`DELETE ${workflowBasePath}/company/:companyId`);
-console.log(`GET ${workflowBasePath}/:id`);
 
 // 404 handler - with more specific error handling
 app.use((req, res) => {
-  console.log(`404 - Not Found: ${req.method} ${req.originalUrl}`);
-  console.log('Available routes were not matched');
   res.status(404).json({
     success: false,
     message: `Route not found: ${req.method} ${req.originalUrl}`,
