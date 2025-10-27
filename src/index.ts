@@ -8,6 +8,7 @@ import seasonRoutes from './routes/season.routes';
 import categoryRoutes from './routes/category.routes';
 import experienceRoutes from './routes/experience.routes';
 import workflowRoutes from './routes/workflow.routes';
+import importRoutes from './routes/import.routes';
 import { errorHandler } from './middleware/error.middleware';
 
 dotenv.config();
@@ -104,6 +105,10 @@ const fileUpload = upload.fields([
 
 // Handle multipart form data for both POST and PUT
 app.use((req, res, next) => {
+    // Skip global multer for import routes
+    if (req.path.startsWith('/api/import')) {
+        return next();
+    }
     
     // Process multipart form data for both POST and PUT requests
     if ((req.method === 'POST' || req.method === 'PUT') && req.is('multipart/form-data')) {
@@ -151,8 +156,9 @@ app.use(experienceBasePath, experienceRoutes);
 const workflowBasePath = '/api/workflow';
 app.use(workflowBasePath, workflowRoutes);
 
-
-
+// Import routes
+const importBasePath = '/api/import';
+app.use(importBasePath, importRoutes);
 
 // 404 handler - with more specific error handling
 app.use((req, res) => {
