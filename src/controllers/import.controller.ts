@@ -4,6 +4,7 @@ import path from 'path';
 import multer from 'multer';
 import { Experience } from '../models/Experience';
 import { Season } from '../models/Season';
+import { sequelize } from '../config/database';
 import { handleErrorResponse, handleSuccessResponse } from '../utils/response.handler';
 
 // Configure multer for file uploads
@@ -40,10 +41,12 @@ export const upload = multer({
  */
 export const importExperiences = async (req: Request & { file?: Express.Multer.File }, res: Response) => {
     let uploadedFilePath: string | null = null;
+    const transaction = await sequelize.transaction();
     
     try {
         // Check if file was uploaded
         if (!req.file) {
+            await transaction.rollback();
             return handleErrorResponse(res, {
                 statusCode: 400,
                 message: 'No file uploaded',
@@ -63,6 +66,7 @@ export const importExperiences = async (req: Request & { file?: Express.Multer.F
         const { activities } = jsonData;
 
         if (!activities || !Array.isArray(activities)) {
+            await transaction.rollback();
             return handleErrorResponse(res, {
                 statusCode: 400,
                 message: 'Invalid JSON format. Expected an object with an "activities" array',
@@ -88,7 +92,8 @@ export const importExperiences = async (req: Request & { file?: Express.Multer.F
                             company_id: activity.company_id,
                             site_id: activity.site_id,
                             is_delete: false
-                        }
+                        },
+                        transaction
                     });
 
                     // If season doesn't exist, create it
@@ -102,14 +107,14 @@ export const importExperiences = async (req: Request & { file?: Express.Multer.F
                             updated_user: undefined,
                             start_month: undefined,
                             end_month: undefined
-                        });
+                        }, { transaction });
                     }
                     seasonId = season.id;
                 }
 
                 // Step 2: Map activity data to experience data
                 const status = activity.activity_status ? activity.activity_status.toLowerCase() : 'draft';
-                const isDelete = status === 'deleted';
+                const isDelete = activity.activity_status === 'DELETED' ? true : activity.activity_status === 'ACTIVE' ? false : false;
                 
                 const experienceData = {
                     name: activity.name || 'Untitled Experience',
@@ -158,11 +163,13 @@ export const importExperiences = async (req: Request & { file?: Express.Multer.F
                     
                     // Default values
                     current_approval_level: 0,
-                    reason_for_reject: undefined
+                    reason_for_reject: undefined,
+                    createdAt: activity.created_on,
+                    updatedAt: activity.updated_on
                 };
 
                 // Create the experience
-                const experience = await Experience.create(experienceData);
+                const experience = await Experience.create(experienceData, { transaction });
                 importedExperiences.push({
                     id: experience.id,
                     name: experience.name,
@@ -177,6 +184,15 @@ export const importExperiences = async (req: Request & { file?: Express.Multer.F
                     error: error instanceof Error ? error.message : 'Unknown error'
                 });
             }
+        }
+
+        // Check if there were errors during import
+        if (errors.length > 0) {
+            // Rollback transaction if there were any errors
+            await transaction.rollback();
+        } else {
+            // Commit transaction if all imports succeeded
+            await transaction.commit();
         }
 
         // Clean up uploaded file
@@ -199,6 +215,13 @@ export const importExperiences = async (req: Request & { file?: Express.Multer.F
 
     } catch (error) {
         console.error('Error importing experiences:', error);
+        
+        // Rollback transaction in case of error
+        try {
+            await transaction.rollback();
+        } catch (rollbackError) {
+            console.error('Error during transaction rollback:', rollbackError);
+        }
         
         // Clean up uploaded file in case of error
         if (uploadedFilePath && fs.existsSync(uploadedFilePath)) {
