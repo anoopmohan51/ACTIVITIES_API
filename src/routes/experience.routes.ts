@@ -872,28 +872,29 @@ router.patch('/:id', async (req, res) => {
         // Only increment approval level if status is not 'published'
         if (status !== 'published') {
             newApprovalLevel = previousLevel + 1;
-            
-            // Get the next approval level from approval_levels table
-            const approvalLevel = await ApprovalLevels.findOne({
-                where: {
-                    company_id: experience.company_id,
-                    is_delete: false,
-                    level: newApprovalLevel
-                },
-                order: [['level', 'ASC']]
-            });
-
-            if (!approvalLevel && status !== 'rejected') {
-                return handleErrorResponse(res, {
-                    statusCode: 404,
-                    message: 'No approval levels configured for this company',
-                    errors: [{
-                        path: 'approval_levels',
-                        message: 'Approval levels not found for this company'
-                    }]
-                });
-            }
         }
+            
+        //     // Get the next approval level from approval_levels table
+        //     const approvalLevel = await ApprovalLevels.findOne({
+        //         where: {
+        //             company_id: experience.company_id,
+        //             is_delete: false,
+        //             level: newApprovalLevel
+        //         },
+        //         order: [['level', 'ASC']]
+        //     });
+
+        //     if (!approvalLevel && status !== 'rejected') {
+        //         return handleErrorResponse(res, {
+        //             statusCode: 404,
+        //             message: 'No approval levels configured for this company',
+        //             errors: [{
+        //                 path: 'approval_levels',
+        //                 message: 'Approval levels not found for this company'
+        //             }]
+        //         });
+        //     }
+        // }
 
         // Determine the action based on status
         if (status === 'rejected') {
@@ -906,7 +907,7 @@ router.patch('/:id', async (req, res) => {
         } else if (status === 'approved') {
             action = 'approved';
         }
-
+        console.log("newApprovalLevel:::::::::::", newApprovalLevel);
         // Update experience with new status and approval level
         await experience.update({
             status: status,
@@ -975,6 +976,7 @@ router.post('/approval/filter', async (req, res) => {
         // Get pagination from query params
         const limit = parseInt(req.query.limit as string) || 10;  // Default limit to 10
         const offset = parseInt(req.query.offset as string) || 0; // Default offset to 0
+        const is_published = req.query.is_published as string || "false";
         
         const { user_id, usergroup, filter } = req.body;
 
@@ -1015,7 +1017,6 @@ router.post('/approval/filter', async (req, res) => {
         } else if (orConditions.length === 1) {
             Object.assign(levelMappingWhere, orConditions[0]);
         }
-
         // Find level mappings for the user/group
         const levelMappings = await LevelMapping.findAll({
             where: levelMappingWhere,
@@ -1027,7 +1028,7 @@ router.post('/approval/filter', async (req, res) => {
             }]
         });
 
-        if (!levelMappings || levelMappings.length === 0) {
+        if (!levelMappings || levelMappings.length === 0 && is_published==="false"||is_published==="False") {
             return handleSuccessResponse(res, {
                 message: 'No approval levels found for this user/group',
                 data: {
@@ -1048,8 +1049,8 @@ router.post('/approval/filter', async (req, res) => {
         const userLevels = levelMappings.map(mapping => 
             (mapping.approvalLevel as any)?.level
         ).filter(level => level !== undefined && level !== null);
-
-        if (userLevels.length === 0) {
+        
+        if (userLevels.length === 0 && is_published==="false"||is_published==="False") {
             return handleSuccessResponse(res, {
                 message: 'No valid approval levels found',
                 data: {
@@ -1065,7 +1066,29 @@ router.post('/approval/filter', async (req, res) => {
                 }
             });
         }
+        if (is_published==="true"||is_published==="True") {
+            // Get company_id from filter or from levelMappings
+            const companyId = filter?.company_id || (levelMappings[0]?.approvalLevel as any)?.company_id;
+            
+            if (companyId) {
+                // Get the maximum approval level for the company
+                const maxLevel = await ApprovalLevels.max('level', {
+                    where: {
+                        company_id: companyId,
+                        is_delete: false
+                    }
+                }) as number | null;
 
+                if (maxLevel !== null && maxLevel !== undefined) {
+                    // Add max_level + 1 to userLevels array
+                    const publishedLevel = maxLevel + 1;
+                    if (!userLevels.includes(publishedLevel)) {
+                        userLevels.push(publishedLevel);
+                    }
+                }
+            }
+            console.log("userLevels after adding max_level+1:", userLevels);
+        }
         // Build where clause for experiences
         const experienceWhere: any = {
             is_delete: false,
@@ -1155,7 +1178,7 @@ router.post('/approval/filter', async (req, res) => {
 
             // Determine if this experience is at final approval level
             const isFinalLevel = maxApprovalLevel !== null 
-                ? experience.current_approval_level === maxApprovalLevel 
+                ? experience.current_approval_level > maxApprovalLevel 
                 : false;
 
             return {
