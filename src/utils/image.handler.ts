@@ -20,9 +20,16 @@ const ensureDirectory = (dirPath: string): void => {
 
 // Helper function to delete a file if it exists
 const deleteFileIfExists = (filePath: string): void => {
-    if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        console.log(`Deleted file: ${filePath}`);
+    try {
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            console.log(`Successfully deleted file: ${filePath}`);
+        } else {
+            console.log(`File does not exist, skipping: ${filePath}`);
+        }
+    } catch (error) {
+        console.error(`Error deleting file ${filePath}:`, error);
+        // Don't throw, just log the error and continue
     }
 };
 
@@ -68,7 +75,7 @@ const saveImageAndCreateRecord = async (
 
 export const handleImagesUpload = async (images: ImageFile[] | null, experienceId: number): Promise<ExperienceImage[]> => {
     const imageRecords: ExperienceImage[] = [];
-    const experienceDirPath = path.join('/app/images', experienceId.toString());
+    const experienceDirPath = path.join(__dirname, '..', '..', 'images', experienceId.toString());
 
     try {
         // Get existing images
@@ -83,53 +90,91 @@ export const handleImagesUpload = async (images: ImageFile[] | null, experienceI
             
             // Delete all existing files and records
             for (const image of existingImages) {
-                deleteFileIfExists(path.join('/app', image.path));
+                // Resolve path relative to project root (image.path is like /images/13/file.jpg)
+                const filePath = path.join(__dirname, '..', '..', image.path);
+                deleteFileIfExists(filePath);
                 await image.destroy();
             }
 
             // Remove empty directory if it exists
             if (fs.existsSync(experienceDirPath)) {
-                fs.rmdirSync(experienceDirPath);
+                try {
+                    // Try to remove directory (only works if empty)
+                    fs.rmdirSync(experienceDirPath);
+                    console.log(`Removed empty directory: ${experienceDirPath}`);
+                } catch (error) {
+                    // Directory might not be empty or already deleted
+                    console.log(`Could not remove directory (may not be empty): ${experienceDirPath}`);
+                }
             }
             
             return imageRecords;
         }
 
-        // Ensure directory exists for new uploads
-        ensureDirectory(experienceDirPath);
-
-        // Get list of files to keep
-        const newImageNames = new Set(images.map(img => img.originalname));
-        console.log('New images to process:', Array.from(newImageNames));
-
-        // Remove images that are not in the new upload
+        // Always delete all existing images and files first when new images are provided
+        console.log('Removing all existing images for experience:', experienceId);
+        
+        // Delete all files from database records
         for (const existingImage of existingImages) {
-            if (!newImageNames.has(existingImage.uploaded_file_name)) {
-                console.log(`Removing old image: ${existingImage.uploaded_file_name}`);
-                deleteFileIfExists(path.join('/app', existingImage.path));
-                await existingImage.destroy();
-            } else {
-                console.log(`Keeping existing image: ${existingImage.uploaded_file_name}`);
-                imageRecords.push(existingImage);
-            }
+            // Resolve path relative to project root (image.path is like /images/13/file.jpg)
+            const filePath = path.join(__dirname, '..', '..', existingImage.path);
+            console.log(`Attempting to delete file: ${filePath}`);
+            deleteFileIfExists(filePath);
+            await existingImage.destroy();
+            console.log(`Deleted database record for: ${existingImage.path}`);
         }
 
-        // Process new images
-        for (const image of images) {
-            // Skip if image already exists
-            const existingImage = existingImages.find(img => img.uploaded_file_name === image.originalname);
-            if (existingImage) {
-                continue; // Already added to imageRecords above
-            }
+        // Ensure directory exists for new uploads
+        ensureDirectory(experienceDirPath);
+        console.log('Directory ensured:', experienceDirPath);
 
-            // Save new image
+        // Process and save all new images
+        console.log(`Processing ${images.length} new images`);
+        for (const image of images) {
             const newImageRecord = await saveImageAndCreateRecord(image, experienceId, experienceDirPath);
             if (newImageRecord) {
                 imageRecords.push(newImageRecord);
+                console.log(`Successfully saved image: ${image.originalname}`);
             }
         }
 
-        console.log(`Successfully processed ${imageRecords.length} images`);
+        // Delete orphaned files: files in directory but NOT in database (after saving new images)
+        // Fetch all valid images from database to ensure we have the complete list
+        const validImagesInDb = await ExperienceImage.findAll({
+            where: { experience_id: experienceId }
+        });
+
+        if (fs.existsSync(experienceDirPath)) {
+            try {
+                // Get all files in the directory
+                const filesInDirectory = fs.readdirSync(experienceDirPath);
+                
+                // Get all valid file names from database
+                const validFileNames = new Set(
+                    validImagesInDb.map(img => {
+                        // Extract filename from path (e.g., /images/13/file.jpg -> file.jpg)
+                        return path.basename(img.path);
+                    })
+                );
+                
+                console.log(`Checking for orphaned files: ${filesInDirectory.length} files in directory, ${validFileNames.size} valid in database`);
+                
+                // Delete files that are not in the database
+                for (const file of filesInDirectory) {
+                    const filePath = path.join(experienceDirPath, file);
+                    const stats = fs.statSync(filePath);
+                    
+                    if (stats.isFile() && !validFileNames.has(file)) {
+                        deleteFileIfExists(filePath);
+                        console.log(`Deleted orphaned file (not in database): ${file}`);
+                    }
+                }
+            } catch (error) {
+                console.error(`Error cleaning orphaned files in ${experienceDirPath}:`, error);
+            }
+        }
+
+        console.log(`Successfully processed ${imageRecords.length} images for experience ${experienceId}`);
         return imageRecords;
     } catch (error) {
         console.error('Error in handleImagesUpload:', error);

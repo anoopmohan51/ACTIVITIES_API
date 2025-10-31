@@ -1,0 +1,60 @@
+// Test data for PUT /api/workflow/company/123
+// This endpoint performs upsert operations (create/update) and cascading deletes
+
+const putRequestPayload = [
+  {
+    "id": 1, // Existing approval level - will be updated
+    "level": 1,
+    "company_id": "123",
+    "created_user": "system",
+    "updated_user": "system",
+    "is_delete": false,
+    "createdAt": "2025-10-10T05:59:36.085Z",
+    "updatedAt": "2025-10-10T05:59:36.085Z",
+    "levelMappings": [
+      { 
+        "id": 1, // Existing mapping - will be updated
+        "workflow_id": 1, 
+        "user_id": 1, 
+        "usergroup": null 
+      },
+      { 
+        "id": 2, // Existing mapping - will be updated
+        "workflow_id": 1, 
+        "user_id": 2, 
+        "usergroup": null 
+      },
+      { 
+        // No id - new mapping - will be created
+        "workflow_id": 1, 
+        "user_id": 4, 
+        "usergroup": null 
+      }
+    ]
+  },
+  {
+    // No id - new approval level - will be created
+    "level": 2,
+    "company_id": "123",
+    "levelMappings": [
+      { 
+        // No id - new mapping - will be created
+        "workflow_id": 2, 
+        "user_id": 5, 
+        "usergroup": null 
+      }
+    ]
+  }
+];
+
+console.log('PUT Request Payload for /api/workflow/company/123:');
+console.log(JSON.stringify(putRequestPayload, null, 2));
+
+console.log('\nExpected Behavior:');
+console.log('1. Update approval level with id=1');
+console.log('2. Update level mappings with id=1 and id=2');
+console.log('3. Create new level mapping for approval level 1');
+console.log('4. Create new approval level (level=2)');
+console.log('5. Create new level mapping for the new approval level');
+console.log('6. Delete any approval levels for company 123 not in the payload');
+console.log('7. Delete any level mappings for each approval level not in the payload');

@@ -1,0 +1,49 @@
+// CORRECTED: PUT /api/workflow/company/123
+// The payload should be sent as a direct array (not wrapped in an object)
+
+const correctPutPayload = [
+  {
+    "id": 1,
+    "level": 1,
+    "company_id": "123",
+    "created_user": "system",
+    "updated_user": "system",
+    "is_delete": false,
+    "createdAt": "2025-10-10T05:59:36.085Z",
+    "updatedAt": "2025-10-10T05:59:36.085Z",
+    "levelMappings": [
+      {
+        "id": 1,
+        "workflow_id": 1, // Note: This field is required for validation
+        "user_id": 1,
+        "usergroup": null,
+        "createdAt": "2025-10-10T05:59:36.597Z",
+        "updatedAt": "2025-10-10T05:59:36.597Z"
+      },
+      {
+        "id": 2,
+        "workflow_id": 1, // Note: This field is required for validation
+        "user_id": 2,
+        "usergroup": null,
+        "createdAt": "2025-10-10T05:59:36.757Z",
+        "updatedAt": "2025-10-10T05:59:36.757Z"
+      },
+      {
+        "id": 3,
+        "workflow_id": 1, // Note: This field is required for validation
+        "user_id": 3,
+        "usergroup": null,
+        "createdAt": "2025-10-10T05:59:36.873Z",
+        "updatedAt": "2025-10-10T05:59:36.873Z"
+      }
+    ]
+  }
+];
+
+console.log('CORRECTED PUT Payload for /api/workflow/company/123:');
+console.log(JSON.stringify(correctPutPayload, null, 2));
+
+console.log('\nKey Changes Made:');
+console.log('1. Payload is sent as direct array (not wrapped in object)');
+console.log('2. Added missing "workflow_id" field to each levelMapping');
+console.log('3. Controller now expects array directly instead of { approval_levels: [...] }');

@@ -1,0 +1,28 @@
+const testData = {
+  "approval_levels": [
+    {
+      "company_id": "123",
+      "level": 1,
+      "approval_mapping": [
+        {
+          "workflow_id": 1,
+          "user_id": 1,
+          "user_group": null
+        },
+        {
+          "workflow_id": 1,
+          "user_id": 2,
+          "user_group": null
+        },
+        {
+          "workflow_id": 1,
+          "user_id": 3,
+          "user_group_id": null
+        }
+      ]
+    }
+  ]
+};
+
+console.log('Test data for POST /api/workflow:');
+console.log(JSON.stringify(testData, null, 2));

@@ -47,6 +47,7 @@ interface ExperienceAttributes {
     company_id?: string;
     site_id?: string;
     department_id?: string;
+    current_approval_level?: number;
     reason_for_reject?: string;
     created_user?: string;
     updated_user?: string;
@@ -98,6 +99,7 @@ export class Experience extends Model<ExperienceAttributes> {
     declare company_id: CreationOptional<string>;
     declare site_id: CreationOptional<string>;
     declare department_id: CreationOptional<string>;
+    declare current_approval_level: CreationOptional<number>;
     declare reason_for_reject: CreationOptional<string>;
     declare created_user: CreationOptional<string>;
     declare updated_user: CreationOptional<string>;
@@ -144,7 +146,7 @@ export class Experience extends Model<ExperienceAttributes> {
                 status: {
                     type: DataTypes.TEXT,
                     allowNull: false,
-                    defaultValue: 'pending'
+                    defaultValue: 'draft'
                 },
                 categoryId: {
                     type: DataTypes.INTEGER,
@@ -305,6 +307,11 @@ export class Experience extends Model<ExperienceAttributes> {
                 department_id: {
                     type: DataTypes.STRING,
                     allowNull: true,
+                },
+                current_approval_level: {
+                    type: DataTypes.INTEGER,
+                    allowNull: false,
+                    defaultValue: 0,
                 },
                 reason_for_reject: {
                     type: DataTypes.TEXT,

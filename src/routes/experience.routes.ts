@@ -1,29 +1,19 @@
 import express, { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { Op } from 'sequelize';
 import { Experience } from '../models/Experience';
 import { Category } from '../models/Category';
 import { Season } from '../models/Season';
 import { ExperienceImage } from '../models/ExperienceImage';
+import { ApprovalLogs } from '../models/ApprovalLogs';
+import { ApprovalLevels } from '../models/ApprovalLevels';
+import { LevelMapping } from '../models/LevelMapping';
 import { handleErrorResponse, handleSuccessResponse } from '../utils/response.handler';
 import { handleVideoUpload } from '../utils/video.handler';
 import { handleImagesUpload } from '../utils/image.handler';
 
 const router: Router = express.Router();
-
-// Debug: Log when router is created
-console.log('\n=== Experience Router Initialization ===');
-console.log('Creating experience router');
-
-// Debug middleware for all experience routes
-router.use((req, res, next) => {
-    console.log('\n=== Experience Route Debug ===');
-    console.log('Method:', req.method);
-    console.log('Path:', req.path);
-    console.log('Full URL:', req.originalUrl);
-    console.log('Params:', req.params);
-    next();
-});
 
 
 interface ErrorResponse {
@@ -51,39 +41,10 @@ interface ExperienceWithRelations extends Omit<Experience, 'category' | 'season'
 router.post('/', async (req, res) => {
     try {
         // Debug logging for form-data
-        console.log('\n=== Form Data Details ===');
-        console.log('Content-Type:', req.headers['content-type']);
         // No file handling in this route
         
         // Get form data
         const formData: Record<string, any> = req.body;
-        
-        // Print form fields in a structured way
-        console.log('\nReceived Form Fields:');
-        console.log('---------------------');
-        console.log('Required Fields:');
-        console.log('- company_id:', formData.company_id);
-        console.log('- site_id:', formData.site_id);
-        console.log('- created_user:', formData.created_user);
-        console.log('- updated_user:', formData.updated_user);
-        console.log('- is_delete:', formData.is_delete);
-        
-        console.log('\nGuide Fields:');
-        console.log('- isGuided:', formData.isGuided);
-        console.log('- guideType:', formData.guideType);
-        console.log('- noOfGuides:', formData.noOfGuides);
-        
-        console.log('\nMedia Fields:');
-        console.log('- video:', formData.video || 'Not provided');
-        console.log('- imagesUrl:', formData.images || 'Not provided');
-        
-        console.log('\nAdditional Fields:');
-        console.log('- additionalInformation:', formData.additionalInformation);
-        console.log('- termsAndConditions:', formData.termsAndConditions);
-        console.log('- costBreakdown:', formData.costBreakdown);
-        console.log('- billingInstructions:', formData.billingInstructions);
-        
-        console.log('\n=====================');
         
         // Check if form data exists
         if (!req.body || Object.keys(req.body).length === 0) {
@@ -96,22 +57,6 @@ router.post('/', async (req, res) => {
                 }]
             });
         }
-        
-        // Log raw request body
-        console.log('Raw request body:', req.body);
-        console.log('Content-Type:', req.headers['content-type']);
-
-        // Log individual field values for debugging
-        console.log('=== Form Field Values ===');
-        console.log('site_id:', formData.site_id);
-        console.log('name:', formData.name);
-        console.log('additionalInformation:', formData.additionalInformation);
-        console.log('termsAndConditions:', formData.termsAndConditions);
-        console.log('costBreakdown:', formData.costBreakdown);
-        console.log('billingInstructions:', formData.billingInstructions);
-        console.log('company_id:', formData.company_id);
-        console.log('created_user:', formData.created_user);
-        console.log('=====================');
 
         // Create the experience object from form-data
         const experienceData = {
@@ -122,7 +67,7 @@ router.post('/', async (req, res) => {
             updated_user: formData.updated_user || undefined,
             is_delete: formData.is_delete === 'true',
             name: formData.name || 'Untitled Experience',
-            status: 'pending',
+            status: 'draft',
 
             // Boolean fields
             isExcursion: formData.isExcursion === 'true',
@@ -170,7 +115,6 @@ router.post('/', async (req, res) => {
         };
         
 
-        console.log('Experience data:', experienceData);
 
         // Validate required fields
         if (!experienceData.site_id) {
@@ -187,24 +131,27 @@ router.post('/', async (req, res) => {
         // Create the experience
         const experience = await Experience.create(experienceData);
         
+        // Create approval log entry
+        try {
+            await ApprovalLogs.create({
+                experience_id: experience.id,
+                company_id: experienceData.company_id || null,
+                site_id: experienceData.site_id || null,
+                current_level: 0,
+                previous_level: null,
+                approved_by: null,
+                status: experienceData.status || 'draft',
+                action: 'created'
+            });
+        } catch (logError) {
+            console.error('Error creating approval log:', logError);
+            // Continue even if approval log creation fails
+        }
+        
         // Initialize empty arrays for media URLs
         experience.imagesUrl = [];
         experience.videosUrl = null as any;
 
-        // Debug file uploads
-        console.log('\n=== File Upload Debug ===');
-        console.log('req.files:', JSON.stringify(req.files, null, 2));
-        console.log('req.files type:', typeof req.files);
-        if (req.files) {
-            console.log('Available file fields:', Object.keys(req.files));
-            if ((req.files as any).images) {
-                console.log('Number of images:', (req.files as any).images.length);
-                console.log('Image details:', JSON.stringify((req.files as any).images, null, 2));
-            } else {
-                console.log('No images field found in request');
-            }
-        }
-        console.log('======================\n');
 
         // Handle file uploads if provided
         if (req.files) {
@@ -224,28 +171,15 @@ router.post('/', async (req, res) => {
                 }
             }
 
-            // Handle images upload
-            console.log('\n=== Image Upload Debug ===');
-            console.log('Checking for images in files:', files);
-            if (files.images) {
-                console.log('Found images array:', files.images);
-                console.log('Number of images:', files.images.length);
-            } else {
-                console.log('No images found in request');
-            }
-            console.log('======================\n');
 
             if (files.images && files.images.length > 0) {
                 try {
-                    console.log('Attempting to upload', files.images.length, 'images');
                     const imageRecords = await handleImagesUpload(files.images, experience.id);
-                    console.log('Successfully uploaded images:', imageRecords);
                     
                     // Get image paths and update experience
                     const imagePaths = imageRecords.map(record => record.path);
                     await experience.update({ imagesUrl: imagePaths });
                     experience.imagesUrl = imagePaths; // Update the instance for response
-                    console.log('Updated experience with image paths');
                 } catch (uploadError) {
                     console.error('Error handling images upload:', uploadError);
                     console.error('Error details:', JSON.stringify(uploadError, null, 2));
@@ -418,7 +352,6 @@ router.delete('/:id', async (req, res) => {
             updated_user: experience.updated_user, // Preserve the last updated user
             updatedAt: new Date() // Update the timestamp
         });
-        console.log(`Soft deleted experience with ID: ${experienceId}`);
 
         return handleSuccessResponse(res, {
             message: 'Experience deleted successfully',
@@ -446,28 +379,12 @@ router.delete('/:id', async (req, res) => {
  * @desc Update an experience
  */
 router.put('/:id', async (req, res) => {
-    console.log('\n=== PUT Experience Handler ===');
-    console.log('Handler triggered for PUT /:id');
-    console.log('ID parameter:', req.params.id);
-    console.log('Full URL:', req.originalUrl);
-    console.log('Content-Type:', req.headers['content-type']);
-    console.log('PUT route handler called');
-    console.log('Request params:', req.params);
-    console.log('Request path:', req.path);
     try {
-        console.log('\n=== Experience Edit Debug ===');
-        console.log('Request Method:', req.method);
-        console.log('Request Path:', req.path);
-        console.log('Content-Type:', req.headers['content-type']);
-        console.log('Request Body:', req.body);
-        console.log('Request Files:', req.files);
         
         const experienceId = parseInt(req.params.id);
-        console.log('Experience ID:', experienceId);
         
         // Find the experience
         const experience = await Experience.findByPk(experienceId);
-        console.log('Found Experience:', experience?.toJSON());
         if (!experience) {
             return handleErrorResponse(res, {
                 statusCode: 404,
@@ -482,14 +399,10 @@ router.put('/:id', async (req, res) => {
         // Get form data
         const formData: Record<string, any> = req.body;
         
-        // Log the form data we're about to use for update
-        console.log('\nUpdate Data:', formData);
         
         // Create the experience object from form-data
         const experienceData = {
             // Required fields with proper type conversion
-            // site_id: formData.site_id || experience.site_id,
-            // company_id: formData.company_id || experience.company_id,
             updated_user: formData.updated_user || experience.updated_user,
             is_delete: formData.is_delete === 'true' || experience.is_delete,
             name: formData.name || experience.name,
@@ -546,7 +459,6 @@ router.put('/:id', async (req, res) => {
             department_id: formData.department_id || experience.department_id,
         };
 
-        console.log('\nProcessed Update Data:', experienceData);
 
         // Update basic fields
         await experience.update(experienceData);
@@ -555,10 +467,6 @@ router.put('/:id', async (req, res) => {
         if (req.files) {
             const files = req.files as { [fieldname: string]: Express.Multer.File[] };
             
-            // Handle video upload or removal
-            console.log('\nChecking for video changes...');
-            console.log('Form data video:', formData.video);
-            console.log('Files video:', files.video);
 
             // Check if video field exists and is empty or invalid
             const shouldRemoveVideo = ('video' in formData) && 
@@ -566,23 +474,19 @@ router.put('/:id', async (req, res) => {
 
             if (shouldRemoveVideo) {
                 // Remove existing video
-                console.log('Video field is empty or invalid, removing existing video');
                 try {
                     await handleVideoUpload(null, experience.id);
                     await experience.update({ videosUrl: '' });
                     experience.videosUrl = ''; // Update the instance for response
-                    console.log('Video removed successfully');
                 } catch (removeError) {
                     console.error('Error removing video:', removeError);
                     console.error('Error details:', removeError instanceof Error ? removeError.message : removeError);
                 }
             } else if (files.video && files.video[0]) {
                 // Upload new video
-                console.log('Valid video file found:', files.video[0].originalname);
                 try {
                     const videoRecord = await handleVideoUpload(files.video[0], experience.id);
                     if (videoRecord) {
-                        console.log('Video upload successful:', videoRecord);
                         await experience.update({ videosUrl: videoRecord.path });
                         experience.videosUrl = videoRecord.path; // Update the instance for response
                     }
@@ -591,25 +495,19 @@ router.put('/:id', async (req, res) => {
                     console.error('Error details:', uploadError instanceof Error ? uploadError.message : uploadError);
                 }
             } else {
-                console.log('No video changes requested');
             }
 
-            // Handle images upload or removal
-            console.log('\nChecking for image updates...');
             
             // Get existing images first
             let currentImages = await ExperienceImage.findAll({
                 where: { experience_id: experience.id }
             });
-            console.log('Current images:', currentImages.map(img => img.toJSON()));
 
             // Check if we should remove images
             if (formData.removeImages === 'true') {
-                console.log('Removing all images as requested');
                 try {
                     await handleImagesUpload(null, experience.id);
                     currentImages = [];
-                    console.log('All images removed successfully');
                 } catch (removeError) {
                     console.error('Error removing images:', removeError);
                 }
@@ -620,36 +518,27 @@ router.put('/:id', async (req, res) => {
                 
                 // Check if we have valid images in the request
                 if (files.images && files.images.length > 0) {
-                    console.log('Found', files.images.length, 'images in request');
                     
                     // Filter out invalid images (like /path/to/file)
                     const validImages = files.images.filter(img => {
                         const isValid = img.originalname !== 'file' && img.size > 0;
                         if (!isValid) {
-                            console.log(`Skipping invalid image: ${img.originalname}`);
                         }
                         return isValid;
                     });
 
                     if (validImages.length > 0) {
-                        console.log('Processing', validImages.length, 'valid images');
-                        validImages.forEach((img, idx) => {
-                            console.log(`Image ${idx + 1}:`, img.originalname);
-                        });
                         imagesToProcess = validImages;
                     } else {
-                        console.log('No valid images to process, removing existing images');
                         imagesToProcess = null;
                     }
                 } else {
-                    console.log('No images in request, removing existing images');
                     imagesToProcess = null;
                 }
 
                 try {
                     // Process images or remove existing ones if no valid images
                     const imageRecords = await handleImagesUpload(imagesToProcess, experience.id);
-                    console.log('Image handling successful:', imageRecords);
                     
                     // Update current images
                     currentImages = imageRecords;
@@ -660,7 +549,6 @@ router.put('/:id', async (req, res) => {
             
             // Update experience with current image paths
             const imagePaths = currentImages.map(img => img.path);
-            console.log('Final image paths:', imagePaths);
             await experience.update({ imagesUrl: imagePaths });
             experience.imagesUrl = imagePaths;
         }
@@ -670,7 +558,6 @@ router.put('/:id', async (req, res) => {
             where: { experience_id: experienceId }
         });
         const imageUrls = latestImages.map(img => img.path);
-        console.log('Latest image URLs:', imageUrls);
 
         // Get category and season data
         const updatedExperience = await Experience.findByPk(experienceId, {
@@ -694,7 +581,6 @@ router.put('/:id', async (req, res) => {
 
         // Get the current video URL
         const videoUrl = updatedExperience.videosUrl;
-        console.log('Current video URL:', videoUrl);
 
         // Prepare response data with the latest media URLs and flatten category/season
         const experienceJson = updatedExperience.toJSON();
@@ -710,7 +596,6 @@ router.put('/:id', async (req, res) => {
             season: undefined
         };
 
-        console.log('Response data:', responseData);
 
         return handleSuccessResponse(res, {
             message: 'Experience updated successfully',
@@ -814,95 +699,6 @@ router.get('/site/:siteId', async (req, res) => {
  * @route POST /api/experience/filter
  * @desc Filter experiences by status and category
  */
-/**
- * @route PATCH /api/experience/:id
- * @desc Update specific fields of an experience
- */
-router.patch('/:id', async (req, res) => {
-    try {
-        const experienceId = parseInt(req.params.id);
-        
-        // Find the experience
-        const experience = await Experience.findByPk(experienceId);
-        
-        if (!experience) {
-            return handleErrorResponse(res, {
-                statusCode: 404,
-                message: 'Experience not found',
-                errors: [{
-                    path: 'id',
-                    message: 'Experience with the provided ID does not exist'
-                }]
-            });
-        }
-
-        // Update only the fields that are provided in the request body
-        await experience.update(req.body);
-
-        // Get the updated experience with relations
-        const updatedExperience = await Experience.findByPk(experienceId, {
-            include: [
-                {
-                    model: Category,
-                    as: 'category',
-                    attributes: ['id', 'name']
-                },
-                {
-                    model: Season,
-                    as: 'season',
-                    attributes: ['id', 'name']
-                },
-                {
-                    model: ExperienceImage,
-                    as: 'images',
-                    attributes: ['id', 'path', 'name', 'uploaded_file_name']
-                }
-            ]
-        });
-
-        if (!updatedExperience) {
-            return handleErrorResponse(res, {
-                statusCode: 404,
-                message: 'Updated experience not found',
-                errors: [{
-                    path: 'id',
-                    message: 'Experience was updated but could not be retrieved'
-                }]
-            });
-        }
-
-        // Format response
-        const imageUrls = updatedExperience?.images?.map(img => img.path) || [];
-        const responseData = {
-            ...(updatedExperience?.toJSON() || {}),
-            videosUrl: updatedExperience.videosUrl || null,
-            imagesUrl: imageUrls,
-            category_name: (updatedExperience as any).category?.name || null,
-            season_name: (updatedExperience as any).season?.name || null,
-            // Remove nested relations
-            images: undefined,
-            category: undefined,
-            season: undefined
-        };
-
-        return handleSuccessResponse(res, {
-            message: 'Experience updated successfully',
-            data: responseData
-        });
-
-    } catch (error) {
-        console.error('Error updating experience:', error);
-        return handleErrorResponse(res, {
-            statusCode: 500,
-            message: error instanceof Error ? error.message : 'Internal server error',
-            errors: [{
-                path: 'server',
-                message: error instanceof Error ? error.message : 'An unexpected error occurred'
-            }]
-        });
-    }
-});
-
 router.post('/filter', async (req, res) => {
     try {
         // Get pagination from query params
@@ -910,7 +706,7 @@ router.post('/filter', async (req, res) => {
         const offset = parseInt(req.query.offset as string) || 0; // Default offset to 0
         
         // Get filters from request body
-        const { status, categoryId ,site_id,company_id} = req.body;
+        const { status, categoryId ,site_id,company_id,current_approval_level} = req.body;
         // Build where clause
         const whereClause: any = {
             is_delete: false, // Always exclude deleted records
@@ -931,6 +727,9 @@ router.post('/filter', async (req, res) => {
         }
         if (company_id) {
             whereClause.company_id = company_id;
+        }
+        if (current_approval_level) {
+            whereClause.current_approval_level = current_approval_level;
         }
         // Fetch filtered experiences with their relations and total count
         const { count, rows: experiences } = await Experience.findAndCountAll({
@@ -1008,6 +807,471 @@ router.post('/filter', async (req, res) => {
 
     } catch (error) {
         console.error('Error filtering experiences:', error);
+        return handleErrorResponse(res, {
+            statusCode: 500,
+            message: error instanceof Error ? error.message : 'Internal server error',
+            errors: [{
+                path: 'server',
+                message: error instanceof Error ? error.message : 'An unexpected error occurred'
+            }]
+        });
+    }
+});
+
+/**
+ * @route PATCH /api/experience/:id/approve
+ * @desc Update experience approval status
+ */
+router.patch('/:id', async (req, res) => {
+    try {
+        const experienceId = parseInt(req.params.id);
+        const { status, approved_by, reason_for_reject } = req.body;
+
+        // Validate required fields
+        if (!status) {
+            return handleErrorResponse(res, {
+                statusCode: 400,
+                message: 'Status is required',
+                errors: [{
+                    path: 'status',
+                    message: 'Status field is required'
+                }]
+            });
+        }
+
+        if (!approved_by) {
+            return handleErrorResponse(res, {
+                statusCode: 400,
+                message: 'Approved by (user_id) is required',
+                errors: [{
+                    path: 'approved_by',
+                    message: 'approved_by field is required'
+                }]
+            });
+        }
+        
+        // Find the experience
+        const experience = await Experience.findByPk(experienceId);
+        
+        if (!experience) {
+            return handleErrorResponse(res, {
+                statusCode: 404,
+                message: 'Experience not found',
+                errors: [{
+                    path: 'id',
+                    message: 'Experience with the provided ID does not exist'
+                }]
+            });
+        }
+
+        // Store previous level
+        const previousLevel = experience.current_approval_level || 0;
+        let newApprovalLevel = previousLevel;
+        let action = 'submitted';
+
+        // Only increment approval level if status is not 'published'
+        if (status !== 'published') {
+            newApprovalLevel = previousLevel + 1;
+        }
+            
+        //     // Get the next approval level from approval_levels table
+        //     const approvalLevel = await ApprovalLevels.findOne({
+        //         where: {
+        //             company_id: experience.company_id,
+        //             is_delete: false,
+        //             level: newApprovalLevel
+        //         },
+        //         order: [['level', 'ASC']]
+        //     });
+
+        //     if (!approvalLevel && status !== 'rejected') {
+        //         return handleErrorResponse(res, {
+        //             statusCode: 404,
+        //             message: 'No approval levels configured for this company',
+        //             errors: [{
+        //                 path: 'approval_levels',
+        //                 message: 'Approval levels not found for this company'
+        //             }]
+        //         });
+        //     }
+        // }
+
+        // Determine the action based on status
+        if (status === 'rejected') {
+            action = 'rejected';
+            newApprovalLevel = 0;
+        } else if (status === 'published') {
+            action = 'published';
+            // Keep current level when published
+            newApprovalLevel = previousLevel;
+        } else if (status === 'approved') {
+            action = 'approved';
+        }
+        console.log("newApprovalLevel:::::::::::", newApprovalLevel);
+        // Update experience with new status and approval level
+        await experience.update({
+            status: status,
+            current_approval_level: newApprovalLevel,
+        });
+
+        // Create approval log entry
+        await ApprovalLogs.create({
+            experience_id: experienceId,
+            company_id: experience.company_id,
+            site_id: experience.site_id,
+            current_level: newApprovalLevel,
+            previous_level: previousLevel,
+            approved_by: approved_by,
+            status: status,
+            action: action,
+            reason_for_reject: status === 'rejected' ? reason_for_reject : null
+        });
+
+        // Get updated experience with relations
+        const updatedExperience = await Experience.findByPk(experienceId, {
+            include: [
+                {
+                    model: Category,
+                    as: 'category',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: Season,
+                    as: 'season',
+                    attributes: ['id', 'name']
+                }
+            ]
+        });
+
+        return handleSuccessResponse(res, {
+            message: `Experience ${action} successfully`,
+            data: {
+                id: experienceId,
+                status: status,
+                current_approval_level: newApprovalLevel,
+                previous_level: previousLevel,
+                experience: updatedExperience
+            }
+        });
+
+    } catch (error) {
+        console.error('Error updating experience approval status:', error);
+        return handleErrorResponse(res, {
+            statusCode: 500,
+            message: error instanceof Error ? error.message : 'Internal server error',
+            errors: [{
+                path: 'server',
+                message: error instanceof Error ? error.message : 'An unexpected error occurred'
+            }]
+        });
+    }
+});
+
+/**
+ * @route POST /api/experience/approval/filter
+ * @desc Filter experiences for approval based on user levels
+ */
+router.post('/approval/filter', async (req, res) => {
+    try {
+        // Get pagination from query params
+        const limit = parseInt(req.query.limit as string) || 10;  // Default limit to 10
+        const offset = parseInt(req.query.offset as string) || 0; // Default offset to 0
+        const is_published = req.query.is_published as string || "false";
+        
+        const { user_id, usergroup, filter } = req.body;
+
+        // Validate required fields
+        const hasValidUsergroup = usergroup && (Array.isArray(usergroup) ? usergroup.length > 0 : true);
+        
+        if (!user_id && !hasValidUsergroup) {
+            return handleErrorResponse(res, {
+                statusCode: 400,
+                message: 'Either user_id or usergroup is required',
+                errors: [{
+                    path: 'user_id/usergroup',
+                    message: 'At least one identifier is required'
+                }]
+            });
+        }
+
+        // Build where clause for level mappings using OR logic
+        const levelMappingWhere: any = {};
+        const orConditions: any[] = [];
+        
+        if (user_id) {
+            orConditions.push({ user_id: user_id });
+        }
+        
+        if (hasValidUsergroup) {
+            // Handle both single usergroup and array of usergroups
+            if (Array.isArray(usergroup)) {
+                orConditions.push({ usergroup: { [Op.in]: usergroup } });
+            } else {
+                orConditions.push({ usergroup: usergroup });
+            }
+        }
+
+        // Apply OR conditions if multiple criteria exist
+        if (orConditions.length > 1) {
+            levelMappingWhere[Op.or] = orConditions;
+        } else if (orConditions.length === 1) {
+            Object.assign(levelMappingWhere, orConditions[0]);
+        }
+        // Find level mappings for the user/group
+        const levelMappings = await LevelMapping.findAll({
+            where: levelMappingWhere,
+            include: [{
+                model: ApprovalLevels,
+                as: 'approvalLevel',
+                where: { is_delete: false },
+                required: true
+            }]
+        });
+
+        if (!levelMappings || levelMappings.length === 0 && is_published==="false"||is_published==="False") {
+            return handleSuccessResponse(res, {
+                message: 'No approval levels found for this user/group',
+                data: {
+                    experiences: [],
+                    user_levels: [],
+                    pagination: {
+                        total: 0,
+                        totalPages: 0,
+                        currentPage: 1,
+                        limit: Number(limit),
+                        offset: Number(offset)
+                    }
+                }
+            });
+        }
+
+        // Extract levels from the mappings
+        const userLevels = levelMappings.map(mapping => 
+            (mapping.approvalLevel as any)?.level
+        ).filter(level => level !== undefined && level !== null);
+        
+        if (userLevels.length === 0 && is_published==="false"||is_published==="False") {
+            return handleSuccessResponse(res, {
+                message: 'No valid approval levels found',
+                data: {
+                    experiences: [],
+                    user_levels: [],
+                    pagination: {
+                        total: 0,
+                        totalPages: 0,
+                        currentPage: 1,
+                        limit: Number(limit),
+                        offset: Number(offset)
+                    }
+                }
+            });
+        }
+        if (is_published==="true"||is_published==="True") {
+            // Get company_id from filter or from levelMappings
+            const companyId = filter?.company_id || (levelMappings[0]?.approvalLevel as any)?.company_id;
+            
+            if (companyId) {
+                // Get the maximum approval level for the company
+                const maxLevel = await ApprovalLevels.max('level', {
+                    where: {
+                        company_id: companyId,
+                        is_delete: false
+                    }
+                }) as number | null;
+
+                if (maxLevel !== null && maxLevel !== undefined) {
+                    // Add max_level + 1 to userLevels array
+                    const publishedLevel = maxLevel + 1;
+                    if (!userLevels.includes(publishedLevel)) {
+                        userLevels.push(publishedLevel);
+                    }
+                }
+            }
+            console.log("userLevels after adding max_level+1:", userLevels);
+        }
+        // Build where clause for experiences
+        const experienceWhere: any = {
+            is_delete: false,
+            current_approval_level: userLevels, // Filter by user's approval levels
+            status: { [Op.ne]: 'published' } // Exclude published experiences
+        };
+
+        // Add additional filters from request
+        if (filter) {
+            if (filter.categoryId) {
+                experienceWhere.categoryId = filter.categoryId;
+            }
+            if (filter.company_id) {
+                experienceWhere.company_id = filter.company_id;
+            }
+            if (filter.site_id) {
+                experienceWhere.site_id = filter.site_id;
+            }
+        }
+
+        // Fetch experiences matching the criteria with pagination
+        const { count, rows: experiences } = await Experience.findAndCountAll({
+            where: experienceWhere,
+            limit: Number(limit),
+            offset: Number(offset),
+            include: [
+                {
+                    model: Category,
+                    as: 'category',
+                    attributes: ['id', 'name'],
+                    required: false
+                },
+                {
+                    model: Season,
+                    as: 'season',
+                    attributes: ['id', 'name'],
+                    required: false
+                },
+                {
+                    model: ExperienceImage,
+                    as: 'images',
+                    attributes: ['id', 'path', 'name', 'uploaded_file_name']
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
+        // Check if no experiences found
+        if (!experiences || experiences.length === 0) {
+            return handleSuccessResponse(res, {
+                message: 'No experiences found for approval',
+                data: {
+                    experiences: [],
+                    user_levels: userLevels,
+                    pagination: {
+                        total: 0,
+                        totalPages: 0,
+                        currentPage: Math.floor(offset / limit) + 1,
+                        limit: Number(limit),
+                        offset: Number(offset)
+                    }
+                }
+            });
+        }
+
+        // Get the maximum approval level from the company_id in filter
+        let maxApprovalLevel: number | null = null;
+        
+        if (filter?.company_id) {
+            const maxLevelRecord = await ApprovalLevels.findOne({
+                where: {
+                    company_id: filter.company_id,
+                    is_delete: false
+                },
+                order: [['level', 'DESC']],
+                attributes: ['level']
+            });
+            
+            if (maxLevelRecord && maxLevelRecord.level !== null) {
+                maxApprovalLevel = maxLevelRecord.level;
+            }
+        }
+
+        // Format experiences using common response structure
+        const formattedExperiences = experiences.map(experience => {
+            const imageUrls = experience.images?.map(img => img.path) || [];
+
+            // Determine if this experience is at final approval level
+            const isFinalLevel = maxApprovalLevel !== null 
+                ? experience.current_approval_level > maxApprovalLevel 
+                : false;
+
+            return {
+                ...experience.toJSON(),
+                videosUrl: experience.videosUrl || null,
+                imagesUrl: imageUrls,
+                category_name: (experience as any).category?.name || null,
+                season_name: (experience as any).season?.name || null,
+                is_final_level: isFinalLevel,
+                // Remove nested relations from the response
+                images: undefined,
+                category: undefined,
+                season: undefined
+            };
+        });
+
+        // Calculate pagination metadata
+        const totalPages = Math.ceil(count / limit);
+        const currentPage = Math.floor(offset / limit) + 1;
+
+        return handleSuccessResponse(res, {
+            message: 'Experiences retrieved successfully',
+            data: {
+                experiences: formattedExperiences,
+                user_levels: userLevels,
+                pagination: {
+                    total: count,
+                    totalPages,
+                    currentPage,
+                    limit: Number(limit),
+                    offset: Number(offset)
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Error filtering experiences for approval:', error);
+        return handleErrorResponse(res, {
+            statusCode: 500,
+            message: error instanceof Error ? error.message : 'Internal server error',
+            errors: [{
+                path: 'server',
+                message: error instanceof Error ? error.message : 'An unexpected error occurred'
+            }]
+        });
+    }
+});
+
+/**
+ * @route GET /api/experience/approval_level/:company_id
+ * @desc Get count of approval levels for a company
+ */
+router.get('/approval_level/:company_id', async (req, res) => {
+    try {
+        const { company_id } = req.params;
+        // Validate required parameter
+        if (!company_id) {
+            return handleErrorResponse(res, {
+                statusCode: 400,
+                message: 'Company ID is required',
+                errors: [{
+                    path: 'company_id',
+                    message: 'company_id parameter is required'
+                }]
+            });
+        }
+
+        // Get count of approval levels for this company
+        const count = await ApprovalLevels.count({
+            where: {
+                company_id: company_id,
+                is_delete: false
+            }
+        });
+
+        // Also get the max level number
+        const maxLevel = await ApprovalLevels.max('level', {
+            where: {
+                company_id: company_id,
+                is_delete: false
+            }
+        }) as number | null;
+        return handleSuccessResponse(res, {
+            message: 'Approval levels count retrieved successfully',
+            data: {
+                company_id: company_id,
+                total_levels: count,
+                max_level: maxLevel || 0,
+            }
+        });
+
+    } catch (error) {
+        console.error('Error getting approval levels count:', error);
         return handleErrorResponse(res, {
             statusCode: 500,
             message: error instanceof Error ? error.message : 'Internal server error',
