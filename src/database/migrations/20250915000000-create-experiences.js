@@ -73,7 +73,7 @@ module.exports = {
         allowNull: true,
       },
       operatingDays: {
-        type: DataTypes.ARRAY(DataTypes.STRING),
+        type: DataTypes.JSON,
         allowNull: true,
       },
       videosUrl: {
@@ -81,7 +81,7 @@ module.exports = {
         allowNull: true,
       },
       imagesUrl: {
-        type: DataTypes.ARRAY(DataTypes.STRING),
+        type: DataTypes.JSON,
         allowNull: true,
       },
       whatWillYouDo: {
@@ -89,7 +89,7 @@ module.exports = {
         allowNull: true,
       },
       tags: {
-        type: DataTypes.ARRAY(DataTypes.STRING),
+        type: DataTypes.JSON,
         allowNull: true,
       },
       whatYouWillExperience: {
@@ -121,11 +121,11 @@ module.exports = {
         allowNull: true,
       },
       whatsIncluded: {
-        type: DataTypes.ARRAY(DataTypes.STRING),
+        type: DataTypes.JSON,
         allowNull: true,
       },
       whatsExcluded: {
-        type: DataTypes.ARRAY(DataTypes.STRING),
+        type: DataTypes.JSON,
         allowNull: true,
       },
       isPickupServiceAvailable: {

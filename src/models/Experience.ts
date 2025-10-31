@@ -209,7 +209,7 @@ export class Experience extends Model<ExperienceAttributes> {
                     allowNull: true,
                 },
                 operatingDays: {
-                    type: DataTypes.ARRAY(DataTypes.STRING),
+                    type: DataTypes.JSON,
                     allowNull: true,
                 },
                 videosUrl: {
@@ -217,7 +217,7 @@ export class Experience extends Model<ExperienceAttributes> {
                     allowNull: true,
                 },
                 imagesUrl: {
-                    type: DataTypes.ARRAY(DataTypes.STRING),
+                    type: DataTypes.JSON,
                     allowNull: true,
                 },
                 whatWillYouDo: {
@@ -225,7 +225,7 @@ export class Experience extends Model<ExperienceAttributes> {
                     allowNull: true,
                 },
                 tags: {
-                    type: DataTypes.ARRAY(DataTypes.STRING),
+                    type: DataTypes.JSON,
                     allowNull: true,
                 },
                 whatYouWillExperience: {
@@ -257,11 +257,11 @@ export class Experience extends Model<ExperienceAttributes> {
                     allowNull: true,
                 },
                 whatsIncluded: {
-                    type: DataTypes.ARRAY(DataTypes.STRING),
+                    type: DataTypes.JSON,
                     allowNull: true,
                 },
                 whatsExcluded: {
-                    type: DataTypes.ARRAY(DataTypes.STRING),
+                    type: DataTypes.JSON,
                     allowNull: true,
                 },
                 isPickupServiceAvailable: {

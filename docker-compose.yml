@@ -8,21 +8,16 @@ services:
     environment:
       - NODE_ENV=development
       - DB_HOST=db
-      - DB_PORT=5432
+      - DB_PORT=3306
       - DB_NAME=activities_db
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
+      - DB_USER=root
+      - DB_PASSWORD=lRgrNXBm3d2hlSkz
       - NODE_OPTIONS=--max-old-space-size=4096
       - CHOKIDAR_USEPOLLING=true  # Enable polling for file changes
       - CHOKIDAR_INTERVAL=1000    # Check for changes every second
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-        reservations:
-          memory: 2G
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
       - .:/app
       - /app/node_modules
@@ -31,15 +26,20 @@ services:
     command: npm run dev
 
   db:
-    image: postgres:16-alpine
+    image: mysql:8
     ports:
-      - "5432:5432"
+      - "3306:3306"
     environment:
-      - POSTGRES_DB=activities_db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - MYSQL_DATABASE=activities_db
+      - MYSQL_ROOT_PASSWORD=lRgrNXBm3d2hlSkz
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-plRgrNXBm3d2hlSkz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   adminer:
     image: adminer:latest
@@ -51,4 +51,4 @@ services:
       - db
 
 volumes:
-  postgres_data:
+  mysql_data:

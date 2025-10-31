@@ -13,15 +13,15 @@ dotenv.config();
 
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
+  port: parseInt(process.env.DB_PORT || '3306'),
   database: process.env.DB_NAME || 'activities_db',
-  username: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
+  username: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
 };
 
 export const sequelize = new Sequelize({
   ...dbConfig,
-  dialect: 'postgres',
+  dialect: 'mysql',
   logging: false, // Disable logging for better performance
   pool: {
     max: 10, // Maximum number of connection in pool
@@ -30,27 +30,40 @@ export const sequelize = new Sequelize({
     idle: 10000 // The maximum time, in milliseconds, that a connection can be idle before being released
   },
   dialectOptions: {
-    statement_timeout: 1000, // Timeout for queries (1s)
-    idle_in_transaction_session_timeout: 10000 // Timeout for idle transactions (10s)
+    connectTimeout: 60000 // MySQL connection timeout
   }
 });
 
 export const initDatabase = async () => {
-  try {
-    await sequelize.authenticate();
-    console.log('Database connection has been established successfully.');
-    
-    // Initialize models
-    await initModels();
-    
-    // Only check model consistency in development
-    if (process.env.NODE_ENV === 'development') {
-      await sequelize.sync({ alter: false });
-      console.log('Database models checked successfully.');
+  const maxRetries = 5;
+  const retryDelay = 5000; // 5 seconds
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await sequelize.authenticate();
+      console.log('Database connection has been established successfully.');
+      
+      // Initialize models
+      await initModels();
+      
+      // Only check model consistency in development
+      if (process.env.NODE_ENV === 'development') {
+        await sequelize.sync({ alter: false });
+        console.log('Database models checked successfully.');
+      }
+      return; // Success, exit the retry loop
+    } catch (error: any) {
+      console.error(`Database connection attempt ${attempt}/${maxRetries} failed:`, error.message);
+      
+      if (attempt === maxRetries) {
+        console.error('Unable to connect to the database after multiple attempts:', error);
+        throw error;
+      }
+      
+      // Wait before retrying
+      console.log(`Retrying in ${retryDelay / 1000} seconds...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
     }
-  } catch (error) {
-    console.error('Unable to connect to the database:', error);
-    throw error;
   }
 };
 

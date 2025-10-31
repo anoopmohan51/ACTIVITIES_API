@@ -10,20 +10,29 @@ export class WorkflowService {
    */
   public async createApprovalLevels(workflowData: any[]): Promise<any[]> {
     const results = [];
+    const seenCombinations = new Set<string>(); // Track company_id + level combinations in this batch
 
     for (const approvalLevelData of workflowData) {
       const { company_id, level, type, levelMappings, created_user, updated_user } = approvalLevelData;
 
-      // Check if approval level already exists for this company_id
+      // Check for duplicates within the same batch
+      const combinationKey = `${company_id}_${level}`;
+      if (seenCombinations.has(combinationKey)) {
+        throw new Error(`Duplicate approval level ${level} for company_id: ${company_id} in the same request`);
+      }
+      seenCombinations.add(combinationKey);
+
+      // Check if approval level already exists for this company_id AND level combination
       const existingApprovalLevel = await ApprovalLevels.findOne({
         where: {
           company_id: company_id,
+          level: level,
           is_delete: false
         }
       });
 
       if (existingApprovalLevel) {
-        throw new Error(`Approval level already exists for company_id: ${company_id}`);
+        throw new Error(`Approval level ${level} already exists for company_id: ${company_id}`);
       }
 
       // Create the approval level
