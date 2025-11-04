@@ -22,19 +22,6 @@ export class WorkflowService {
       }
       seenCombinations.add(combinationKey);
 
-      // Check if approval level already exists for this company_id AND level combination
-      const existingApprovalLevel = await ApprovalLevels.findOne({
-        where: {
-          company_id: company_id,
-          level: level,
-          is_delete: false
-        }
-      });
-
-      if (existingApprovalLevel) {
-        throw new Error(`Approval level ${level} already exists for company_id: ${company_id}`);
-      }
-
       // Create the approval level
       const approvalLevel = await ApprovalLevels.create({
         company_id,
@@ -52,8 +39,7 @@ export class WorkflowService {
           const levelMapping = await LevelMapping.create({
             approvallevels: approvalLevel.id,
             user_id: mapping.user_id?.toString() || null,
-            usergroup: mapping.usergroup?.toString() || null,
-            variable: mapping.variable || null
+            usergroup: mapping.usergroup?.toString() || null
           });
           levelMappingsResult.push(levelMapping);
         }
@@ -83,7 +69,8 @@ export class WorkflowService {
         {
           model: LevelMapping,
           as: 'levelMappings',
-          required: false
+          required: false,
+          attributes: ['id', 'approvallevels', 'user_id', 'usergroup', 'createdAt', 'updatedAt']
         }
       ]
     });
@@ -106,7 +93,8 @@ export class WorkflowService {
         {
           model: LevelMapping,
           as: 'levelMappings',
-          required: false
+          required: false,
+          attributes: ['id', 'approvallevels', 'user_id', 'usergroup', 'createdAt', 'updatedAt']
         }
       ]
     });
@@ -169,7 +157,7 @@ export class WorkflowService {
         const savedLevelMappingIds: number[] = [];
         
         for (const mapping of levelMappings) {
-          const { id: mappingId, workflow_id, user_id, user_group, user_group_id, usergroup, variable } = mapping;
+          const { id: mappingId, workflow_id, user_id, user_group, user_group_id, usergroup } = mapping;
           
           let levelMapping: any;
           
@@ -178,8 +166,7 @@ export class WorkflowService {
             await LevelMapping.update(
               {
                 user_id: user_id?.toString() || null,
-                usergroup: usergroup?.toString() || null,
-                variable: variable || null
+                usergroup: usergroup?.toString() || null
               },
               {
                 where: {
@@ -189,14 +176,15 @@ export class WorkflowService {
               }
             );
             
-            levelMapping = await LevelMapping.findByPk(mappingId);
+            levelMapping = await LevelMapping.findByPk(mappingId, {
+              attributes: ['id', 'approvallevels', 'user_id', 'usergroup', 'createdAt', 'updatedAt']
+            });
           } else {
             // Create new level mapping
             levelMapping = await LevelMapping.create({
               approvallevels: approvalLevel.id,
               user_id: user_id?.toString() || null,
-              usergroup: usergroup?.toString() || null,
-              variable: variable || null
+              usergroup: usergroup?.toString() || null
             });
           }
           
@@ -221,7 +209,8 @@ export class WorkflowService {
             {
               model: LevelMapping,
               as: 'levelMappings',
-              required: false
+              required: false,
+              attributes: ['id', 'approvallevels', 'user_id', 'usergroup', 'createdAt', 'updatedAt']
             }
           ]
         });

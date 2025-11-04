@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { WorkflowService } from '../services/workflow.service';
 import { CreateWorkflowDto, UpdateApprovalLevelDto } from '../dtos/workflow.dto';
 import { handleSuccessResponse, handleErrorResponse } from '../utils/response.handler';
+import { ApprovalLevels } from '../models/ApprovalLevels';
 
 export class WorkflowController {
   private workflowService: WorkflowService;
@@ -44,6 +45,23 @@ export class WorkflowController {
           });
           return;
         }
+
+        // Check if approval level already exists for this company_id AND level combination
+        // const existingApprovalLevel = await ApprovalLevels.findOne({
+        //   where: {
+        //     company_id: approvalLevel.company_id,
+        //     level: approvalLevel.level,
+        //     is_delete: false
+        //   }
+        // });
+
+        // if (existingApprovalLevel) {
+        //   handleErrorResponse(res, {
+        //     statusCode: 400,
+        //     message: `Approval level ${approvalLevel.level} already exists for company_id: ${approvalLevel.company_id}`
+        //   });
+        //  return;
+        // } 
       }
 
       const result = await this.workflowService.createApprovalLevels(workflowData);
