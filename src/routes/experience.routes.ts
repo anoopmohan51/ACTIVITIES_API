@@ -706,32 +706,61 @@ router.post('/filter', async (req, res) => {
         const offset = parseInt(req.query.offset as string) || 0; // Default offset to 0
         
         // Get filters from request body
-        const { status, categoryId ,site_id,company_id,current_approval_level} = req.body;
+        const { status, categoryId ,site_id,company_id,current_approval_level,user_id} = req.body;
         // Build where clause
         const whereClause: any = {
             is_delete: false, // Always exclude deleted records
             // site_id: req.query.property_id as string
         };
+        if (user_id) {
+            // Build the OR condition for draft restriction
+            const orConditions: any[] = [
+                {
+                    status: 'draft',
+                    created_user: user_id  // Only show drafts created by this user
+                },
+                {
+                    status: { [Op.ne]: 'draft' }  // Show all non-draft experiences
+                }
+            ];
 
-        // Add status filter if provided
-        if (status) {
-            whereClause.status = status;
+            // Add other filters to each OR condition to ensure they work correctly
+            const baseFilters: any = {};
+            if (site_id) baseFilters.site_id = site_id;
+            if (company_id) baseFilters.company_id = company_id;
+            if (current_approval_level) baseFilters.current_approval_level = current_approval_level;
+            if (categoryId) baseFilters.categoryId = categoryId;
+
+            // Apply base filters to both OR conditions
+            whereClause[Op.and] = [
+                {
+                    [Op.or]: orConditions.map(condition => ({
+                        ...condition,
+                        ...baseFilters
+                    }))
+                }
+            ];
+        } else {
+            // If no user_id, use normal filtering
+            if (status) {
+                whereClause.status = status;
+            }
+            if (categoryId) {
+                whereClause.categoryId = categoryId;
+            }
+            if (site_id) {
+                whereClause.site_id = site_id;
+            }
+            if (company_id) {
+                whereClause.company_id = company_id;
+            }
+            if (current_approval_level) {
+                whereClause.current_approval_level = current_approval_level;
+            }
         }
 
-        // Add categoryId filter if provided in query params
-        if (categoryId) {
-            whereClause.categoryId = categoryId;
-        }
-        if (site_id) {
-            whereClause.site_id = site_id;
-        }
-        if (company_id) {
-            whereClause.company_id = company_id;
-        }
-        if (current_approval_level) {
-            whereClause.current_approval_level = current_approval_level;
-        }
         // Fetch filtered experiences with their relations and total count
+
         const { count, rows: experiences } = await Experience.findAndCountAll({
             where: whereClause,
             limit: Number(limit),

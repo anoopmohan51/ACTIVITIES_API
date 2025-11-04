@@ -48,7 +48,7 @@ const storage = multer.diskStorage({
 
 
         const type = file.fieldname === 'video' ? 'videos' : 'images';
-        const dir = path.join('/app', type, experience_id);
+        const dir = path.join(__dirname, '..', type, experience_id);
         
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
