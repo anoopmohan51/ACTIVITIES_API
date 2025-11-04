@@ -39,3 +39,7 @@ temp/
 
 # Debug files
 .debug/
+
+# Database migrations
+src/database/migrations/
+**/migrations/*.js
