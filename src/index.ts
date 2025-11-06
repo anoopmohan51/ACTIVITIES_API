@@ -8,6 +8,7 @@ import seasonRoutes from './routes/season.routes';
 import categoryRoutes from './routes/category.routes';
 import experienceRoutes from './routes/experience.routes';
 import workflowRoutes from './routes/workflow.routes';
+import workflowLevelMappingRoutes from './routes/workflow_level_mapping.routes';
 import importRoutes from './routes/import.routes';
 import { errorHandler } from './middleware/error.middleware';
 
@@ -155,6 +156,10 @@ app.use(experienceBasePath, experienceRoutes);
 // Workflow routes
 const workflowBasePath = '/api/workflow';
 app.use(workflowBasePath, workflowRoutes);
+
+// Workflow level mapping routes
+const workflowLevelMappingBasePath = '/api/workflow_level_mapping';
+app.use(workflowLevelMappingBasePath, workflowLevelMappingRoutes);
 
 // Import routes
 const importBasePath = '/api/import';

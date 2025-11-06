@@ -1,5 +1,6 @@
 import { ApprovalLevels } from '../models/ApprovalLevels';
 import { LevelMapping } from '../models/LevelMapping';
+import { Experience } from '../models/Experience';
 import { CreateWorkflowDto, CreateApprovalLevelDto, UpdateWorkflowDto, UpdateApprovalLevelDto } from '../dtos/workflow.dto';
 
 export class WorkflowService {
@@ -301,5 +302,54 @@ export class WorkflowService {
       message: `Successfully deleted ${deletedCount} approval level(s) and their mappings for company ${companyId}`,
       deletedCount
     };
+  }
+
+  /**
+   * Get workflow level details by experience_id and level
+   * @param experienceId - Experience ID
+   * @param level - Approval level
+   * @returns Approval level with its mappings for the specified experience and level
+   */
+  public async getWorkflowLevelMapping(experienceId: number, level: number): Promise<any> {
+    // First, get the experience to retrieve company_id
+    const experience = await Experience.findOne({
+      where: {
+        id: experienceId,
+        is_delete: false
+      },
+      attributes: ['id', 'company_id', 'name']
+    });
+
+    if (!experience) {
+      throw new Error(`Experience with id ${experienceId} not found`);
+    }
+
+    if (!experience.company_id) {
+      throw new Error(`Experience with id ${experienceId} does not have a company_id`);
+    }
+
+    // Get the approval level with its mappings for the company and level
+    const approvalLevel = await ApprovalLevels.findOne({
+      where: {
+        company_id: experience.company_id,
+        level: level,
+        is_delete: false
+      },
+      include: [
+        {
+          model: LevelMapping,
+          as: 'levelMappings',
+          required: false,
+          attributes: ['id', 'approvallevels', 'user_id', 'usergroup', 'createdAt', 'updatedAt']
+        }
+      ],
+      attributes: ['id', 'level', 'type', 'company_id', 'created_user', 'updated_user', 'createdAt', 'updatedAt']
+    });
+
+    if (!approvalLevel) {
+      throw new Error(`No approval level found for company_id ${experience.company_id} and level ${level}`);
+    }
+
+    return approvalLevel;
   }
 }
