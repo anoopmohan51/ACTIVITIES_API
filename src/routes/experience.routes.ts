@@ -712,55 +712,51 @@ router.post('/filter', async (req, res) => {
             is_delete: false, // Always exclude deleted records
             // site_id: req.query.property_id as string
         };
+        
+        // Apply common filters
+        if (categoryId) {
+            whereClause.categoryId = categoryId;
+        }
+        if (site_id) {
+            whereClause.site_id = site_id;
+        }
+        if (company_id) {
+            whereClause.company_id = company_id;
+        }
+        if (current_approval_level) {
+            whereClause.current_approval_level = current_approval_level;
+        }
+        
+        // Handle status filter with user_id restriction
         if (user_id) {
-            // Build the OR condition for draft restriction
-            const orConditions: any[] = [
-                {
-                    status: 'draft',
-                    created_user: user_id  // Only show drafts created by this user
-                },
-                {
-                    status: { [Op.ne]: 'draft' }  // Show all non-draft experiences
-                }
-            ];
-
-            // Add other filters to each OR condition to ensure they work correctly
-            const baseFilters: any = {};
-            if (site_id) baseFilters.site_id = site_id;
-            if (company_id) baseFilters.company_id = company_id;
-            if (current_approval_level) baseFilters.current_approval_level = current_approval_level;
-            if (categoryId) baseFilters.categoryId = categoryId;
-
-            // Apply base filters to both OR conditions
-            whereClause[Op.and] = [
-                {
-                    [Op.or]: orConditions.map(condition => ({
-                        ...condition,
-                        ...baseFilters
-                    }))
-                }
-            ];
+            if (status === 'draft') {
+                // If filtering for drafts, only show drafts created by this user
+                whereClause.status = 'draft';
+                whereClause.created_user = user_id;
+            } else if (status) {
+                // If filtering for a specific status (not draft), show all experiences with that status
+                whereClause.status = status;
+            } else {
+                // If no status filter, use OR condition: drafts by user OR all non-drafts
+                const orConditions: any[] = [
+                    {
+                        status: 'draft',
+                        created_user: user_id  // Only show drafts created by this user
+                    },
+                    {
+                        status: { [Op.ne]: 'draft' }  // Show all non-draft experiences
+                    }
+                ];
+                whereClause[Op.or] = orConditions;
+            }
         } else {
             // If no user_id, use normal filtering
             if (status) {
                 whereClause.status = status;
             }
-            if (categoryId) {
-                whereClause.categoryId = categoryId;
-            }
-            if (site_id) {
-                whereClause.site_id = site_id;
-            }
-            if (company_id) {
-                whereClause.company_id = company_id;
-            }
-            if (current_approval_level) {
-                whereClause.current_approval_level = current_approval_level;
-            }
         }
 
         // Fetch filtered experiences with their relations and total count
-
         const { count, rows: experiences } = await Experience.findAndCountAll({
             where: whereClause,
             limit: Number(limit),
