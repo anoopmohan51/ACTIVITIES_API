@@ -73,7 +73,8 @@ export class WorkflowService {
           required: false,
           attributes: ['id', 'approvallevels', 'user_id', 'usergroup', 'createdAt', 'updatedAt']
         }
-      ]
+      ],
+      order: [['level', 'ASC']]
     });
 
     return approvalLevels;
