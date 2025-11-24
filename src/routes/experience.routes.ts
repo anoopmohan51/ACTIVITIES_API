@@ -15,6 +15,25 @@ import { handleImagesUpload } from '../utils/image.handler';
 
 const router: Router = express.Router();
 
+/**
+ * Normalize price string to remove unnecessary decimal formatting
+ * Converts "11.00" to "11", but preserves "11.50" as "11.50"
+ */
+const normalizePrice = (price: any): string | undefined => {
+    if (price === undefined || price === null || price === '') {
+        return undefined;
+    }
+    const priceStr = String(price).trim();
+    if (!priceStr) return undefined;
+    
+    const num = parseFloat(priceStr);
+    if (isNaN(num)) {
+        return priceStr; // Return as-is if not a valid number
+    }
+    
+    // If it's a whole number, return without decimal point
+    return num % 1 === 0 ? String(Math.floor(num)) : priceStr;
+};
 
 interface ErrorResponse {
     statusCode?: number;
@@ -80,6 +99,7 @@ router.post('/', async (req, res) => {
             department_id: formData.department_id || undefined,
             minimumParticipant: formData.minimumParticipant ? parseInt(formData.minimumParticipant) : undefined,
             maximumParticipant: formData.maximumParticipant ? parseInt(formData.maximumParticipant) : undefined,
+            numberOfPersons: formData.numberOfPersons ? parseInt(formData.numberOfPersons) : undefined,
 
             // Array fields - parse JSON strings if needed
             operatingDays: formData.operatingDays ? (typeof formData.operatingDays === 'string' ? JSON.parse(formData.operatingDays) : formData.operatingDays) : undefined,
@@ -111,6 +131,7 @@ router.post('/', async (req, res) => {
             termsAndConditions: formData.termsAndConditions || undefined,
             costBreakdown: formData.costBreakdown || undefined,
             billingInstructions: formData.billingInstructions || undefined,
+            price: normalizePrice(formData.price),
 
         };
         
@@ -278,10 +299,12 @@ router.get('/:id', async (req, res) => {
         const imageUrls = experience.images?.map(img => img.path) || [];
 
         // Prepare response data
+        const experienceJson = experience.toJSON();
         const responseData = {
-            ...experience.toJSON(),
+            ...experienceJson,
             videosUrl: experience.videosUrl || null,
             imagesUrl: imageUrls,
+            price: normalizePrice(experienceJson.price),
             category_name: (experience as any).category?.name || null,
             season_name: (experience as any).season?.name || null,
             // Remove nested relations from the response
@@ -418,6 +441,7 @@ router.put('/:id', async (req, res) => {
             seasonId: formData.seasonId ? parseInt(formData.seasonId) : experience.seasonId,
             minimumParticipant: formData.minimumParticipant ? parseInt(formData.minimumParticipant) : experience.minimumParticipant,
             maximumParticipant: formData.maximumParticipant ? parseInt(formData.maximumParticipant) : experience.maximumParticipant,
+            numberOfPersons: formData.numberOfPersons ? parseInt(formData.numberOfPersons) : experience.numberOfPersons,
 
             // Array fields - parse JSON strings if needed
             operatingDays: formData.operatingDays ? 
@@ -457,6 +481,7 @@ router.put('/:id', async (req, res) => {
             costBreakdown: formData.costBreakdown || experience.costBreakdown,
             billingInstructions: formData.billingInstructions || experience.billingInstructions,
             department_id: formData.department_id || experience.department_id,
+            price: normalizePrice(formData.price) ?? normalizePrice(experience.price),
         };
 
 
@@ -588,6 +613,7 @@ router.put('/:id', async (req, res) => {
             ...experienceJson,
             videosUrl: videoUrl || null,
             imagesUrl: imageUrls, // Use the directly fetched image URLs
+            price: normalizePrice(experienceJson.price),
             category_name: (updatedExperience as any).category?.name || null,
             season_name: (updatedExperience as any).season?.name || null,
             // Remove nested relations from the response
@@ -668,6 +694,7 @@ router.get('/site/:siteId', async (req, res) => {
         const formattedExperiences = experiences.map((experience: any) => {
             const formatted = {
                 ...experience,
+                price: normalizePrice(experience.price),
                 category: experience.category?.id || null,
                 category_name: experience.category?.name || null,
                 season: experience.season?.id || null,
@@ -712,55 +739,51 @@ router.post('/filter', async (req, res) => {
             is_delete: false, // Always exclude deleted records
             // site_id: req.query.property_id as string
         };
+        
+        // Apply common filters
+        if (categoryId) {
+            whereClause.categoryId = categoryId;
+        }
+        if (site_id) {
+            whereClause.site_id = site_id;
+        }
+        if (company_id) {
+            whereClause.company_id = company_id;
+        }
+        if (current_approval_level) {
+            whereClause.current_approval_level = current_approval_level;
+        }
+        
+        // Handle status filter with user_id restriction
         if (user_id) {
-            // Build the OR condition for draft restriction
-            const orConditions: any[] = [
-                {
-                    status: 'draft',
-                    created_user: user_id  // Only show drafts created by this user
-                },
-                {
-                    status: { [Op.ne]: 'draft' }  // Show all non-draft experiences
-                }
-            ];
-
-            // Add other filters to each OR condition to ensure they work correctly
-            const baseFilters: any = {};
-            if (site_id) baseFilters.site_id = site_id;
-            if (company_id) baseFilters.company_id = company_id;
-            if (current_approval_level) baseFilters.current_approval_level = current_approval_level;
-            if (categoryId) baseFilters.categoryId = categoryId;
-
-            // Apply base filters to both OR conditions
-            whereClause[Op.and] = [
-                {
-                    [Op.or]: orConditions.map(condition => ({
-                        ...condition,
-                        ...baseFilters
-                    }))
-                }
-            ];
+            if (status === 'draft') {
+                // If filtering for drafts, only show drafts created by this user
+                whereClause.status = 'draft';
+                whereClause.created_user = user_id;
+            } else if (status) {
+                // If filtering for a specific status (not draft), show all experiences with that status
+                whereClause.status = status;
+            } else {
+                // If no status filter, use OR condition: drafts by user OR all non-drafts
+                const orConditions: any[] = [
+                    {
+                        status: 'draft',
+                        created_user: user_id  // Only show drafts created by this user
+                    },
+                    {
+                        status: { [Op.ne]: 'draft' }  // Show all non-draft experiences
+                    }
+                ];
+                whereClause[Op.or] = orConditions;
+            }
         } else {
             // If no user_id, use normal filtering
             if (status) {
                 whereClause.status = status;
             }
-            if (categoryId) {
-                whereClause.categoryId = categoryId;
-            }
-            if (site_id) {
-                whereClause.site_id = site_id;
-            }
-            if (company_id) {
-                whereClause.company_id = company_id;
-            }
-            if (current_approval_level) {
-                whereClause.current_approval_level = current_approval_level;
-            }
         }
 
         // Fetch filtered experiences with their relations and total count
-
         const { count, rows: experiences } = await Experience.findAndCountAll({
             where: whereClause,
             limit: Number(limit),
@@ -801,10 +824,12 @@ router.post('/filter', async (req, res) => {
             const imageUrls = experience.images?.map(img => img.path) || [];
 
             // Prepare response data
+            const experienceJson = experience.toJSON();
             const responseData = {
-                ...experience.toJSON(),
+                ...experienceJson,
                 videosUrl: experience.videosUrl || null,
                 imagesUrl: imageUrls,
+                price: normalizePrice(experienceJson.price),
                 category_name: (experience as any).category?.name || null,
                 season_name: (experience as any).season?.name || null,
                 // Remove nested relations from the response
@@ -1204,6 +1229,7 @@ router.post('/approval/filter', async (req, res) => {
         // Format experiences using common response structure
         const formattedExperiences = experiences.map(experience => {
             const imageUrls = experience.images?.map(img => img.path) || [];
+            const experienceJson = experience.toJSON();
 
             // Determine if this experience is at final approval level
             const isFinalLevel = maxApprovalLevel !== null 
@@ -1211,9 +1237,10 @@ router.post('/approval/filter', async (req, res) => {
                 : false;
 
             return {
-                ...experience.toJSON(),
+                ...experienceJson,
                 videosUrl: experience.videosUrl || null,
                 imagesUrl: imageUrls,
+                price: normalizePrice(experienceJson.price),
                 category_name: (experience as any).category?.name || null,
                 season_name: (experience as any).season?.name || null,
                 is_final_level: isFinalLevel,

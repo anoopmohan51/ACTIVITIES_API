@@ -261,4 +261,57 @@ export class WorkflowController {
       });
     }
   };
+
+  /**
+   * Get workflow level mapping by experience_id and level
+   * GET /api/workflow_level_mapping?experience_id=1&level=1
+   */
+  public getWorkflowLevelMapping = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const experienceId = req.query.experience_id;
+      const level = req.query.level;
+
+      // Validate query parameters
+      if (!experienceId || !level) {
+        handleErrorResponse(res, {
+          statusCode: 400,
+          message: 'Both experience_id and level query parameters are required'
+        });
+        return;
+      }
+
+      const experienceIdNum = parseInt(experienceId as string);
+      const levelNum = parseInt(level as string);
+
+      if (isNaN(experienceIdNum)) {
+        handleErrorResponse(res, {
+          statusCode: 400,
+          message: 'Invalid experience_id parameter'
+        });
+        return;
+      }
+
+      if (isNaN(levelNum)) {
+        handleErrorResponse(res, {
+          statusCode: 400,
+          message: 'Invalid level parameter'
+        });
+        return;
+      }
+
+      const result = await this.workflowService.getWorkflowLevelMapping(experienceIdNum, levelNum);
+
+      handleSuccessResponse(res, {
+        message: 'Workflow level mapping retrieved successfully',
+        data: result
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      const statusCode = errorMessage.includes('not found') ? 404 : 500;
+      handleErrorResponse(res, {
+        statusCode,
+        message: `Failed to retrieve workflow level mapping: ${errorMessage}`
+      });
+    }
+  };
 }
