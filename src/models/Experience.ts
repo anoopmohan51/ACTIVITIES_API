@@ -20,6 +20,7 @@ interface ExperienceAttributes {
     noOfGuides?: string;
     minimumParticipant?: number;
     maximumParticipant?: number;
+    numberOfPersons?: number;
     travellMedium?: string;
     prefferedTime?: string;
     operatingDays?: string[];
@@ -43,6 +44,7 @@ interface ExperienceAttributes {
     additionalInformation?: string;
     termsAndConditions?: string;
     costBreakdown?: string;
+    price?: string;
     billingInstructions?: string;
     company_id?: string;
     site_id?: string;
@@ -72,6 +74,7 @@ export class Experience extends Model<ExperienceAttributes> {
     declare noOfGuides: CreationOptional<string>;
     declare minimumParticipant: CreationOptional<number>;
     declare maximumParticipant: CreationOptional<number>;
+    declare numberOfPersons: CreationOptional<number>;
     declare travellMedium: CreationOptional<string>;
     declare prefferedTime: CreationOptional<string>;
     declare operatingDays: CreationOptional<string[]>;
@@ -95,6 +98,7 @@ export class Experience extends Model<ExperienceAttributes> {
     declare additionalInformation: CreationOptional<string>;
     declare termsAndConditions: CreationOptional<string>;
     declare costBreakdown: CreationOptional<string>;
+    declare price: CreationOptional<string>;
     declare billingInstructions: CreationOptional<string>;
     declare company_id: CreationOptional<string>;
     declare site_id: CreationOptional<string>;
@@ -200,6 +204,10 @@ export class Experience extends Model<ExperienceAttributes> {
                     type: DataTypes.INTEGER,
                     allowNull: true,
                 },
+                numberOfPersons: {
+                    type: DataTypes.INTEGER,
+                    allowNull: true,
+                },
                 travellMedium: {
                     type: DataTypes.STRING,
                     allowNull: true,
@@ -290,6 +298,10 @@ export class Experience extends Model<ExperienceAttributes> {
                 },
                 costBreakdown: {
                     type: DataTypes.TEXT,
+                    allowNull: true,
+                },
+                price: {
+                    type: DataTypes.CHAR(50),
                     allowNull: true,
                 },
                 billingInstructions: {
