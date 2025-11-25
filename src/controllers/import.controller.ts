@@ -113,7 +113,18 @@ export const importExperiences = async (req: Request & { file?: Express.Multer.F
                 }
 
                 // Step 2: Map activity data to experience data
-                const status = activity.activity_status ? activity.activity_status.toLowerCase() : 'draft';
+                let status = 'draft'; // default status
+                if (activity.activity_status) {
+                    const activityStatus = activity.activity_status.toUpperCase();
+                    if (activityStatus === 'ON_REVIEW') {
+                        status = 'draft';
+                    } else if (activityStatus === 'APPROVED') {
+                        status = 'published';
+                    } else {
+                        // For other statuses, convert to lowercase
+                        status = activity.activity_status.toLowerCase();
+                    }
+                }
                 const isDelete = activity.activity_status === 'DELETED' ? true : activity.activity_status === 'ACTIVE' ? false : false;
                 
                 const experienceData = {
