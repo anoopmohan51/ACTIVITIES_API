@@ -103,10 +103,10 @@ export const importExperiences = async (req: Request & { file?: Express.Multer.F
                             company_id: activity.company_id,
                             site_id: activity.site_id,
                             is_delete: false,
-                            created_user: activity.initiated_by_id || undefined,
-                            updated_user: undefined,
-                            start_month: undefined,
-                            end_month: undefined
+                            created_user: activity.initiated_by_id || null,
+                            updated_user: "",
+                            start_month: "",
+                            end_month: ""
                         }, { transaction });
                     }
                     seasonId = season.id;
@@ -128,7 +128,7 @@ export const importExperiences = async (req: Request & { file?: Express.Multer.F
                     site_id: activity.site_id,
                     department_id: activity.department_id,
                     created_user: activity.initiated_by_id || undefined,
-                    updated_user: undefined,
+                    updated_user: null as any,
                     is_delete: isDelete,
                     
                     // Boolean fields
