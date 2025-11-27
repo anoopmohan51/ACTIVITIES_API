@@ -413,27 +413,28 @@ router.put('/:id', async (req, res) => {
 
         // Get form data
         const formData: Record<string, any> = req.body;
+        console.log("minimumParticipant",formData.minimumParticipant);
         
         
         // Create the experience object from form-data
         const experienceData = {
             // Required fields with proper type conversion
             updated_user: formData.updated_user || experience.updated_user,
-            is_delete: formData.is_delete === 'true' || experience.is_delete,
+            is_delete: false,
             name: formData.name || experience.name,
-            status: formData.status || experience.status,
+            status: formData.status,
 
             // Boolean fields
-            isExcursion: formData.isExcursion === 'true' || experience.isExcursion,
+            isExcursion: formData.isExcursion === 'true',
             isGuided: formData.isGuided === 'true' || experience.isGuided,
             isPickupServiceAvailable: formData.isPickupServiceAvailable === 'true' || experience.isPickupServiceAvailable,
 
             // Number fields
             categoryId: formData.categoryId ? parseInt(formData.categoryId) : experience.categoryId,
             seasonId: formData.seasonId ? parseInt(formData.seasonId) : experience.seasonId,
-            minimumParticipant: formData.minimumParticipant ? parseInt(formData.minimumParticipant) : experience.minimumParticipant,
-            maximumParticipant: formData.maximumParticipant ? parseInt(formData.maximumParticipant) : experience.maximumParticipant,
-            numberOfPersons: formData.numberOfPersons ? parseInt(formData.numberOfPersons) : experience.numberOfPersons,
+            minimumParticipant: formData.minimumParticipant === "null" || formData.minimumParticipant === null ? null as any : (formData.minimumParticipant ? parseInt(formData.minimumParticipant) : undefined),
+            maximumParticipant: formData.maximumParticipant === "null" || formData.maximumParticipant === null ? null as any : (formData.maximumParticipant ? parseInt(formData.maximumParticipant) : undefined),
+            numberOfPersons: formData.numberOfPersons === "null" || formData.numberOfPersons === null ? null as any : (formData.numberOfPersons ? parseInt(formData.numberOfPersons) : undefined),
 
             // Array fields - parse JSON strings if needed
             operatingDays: formData.operatingDays ? 
@@ -450,30 +451,30 @@ router.put('/:id', async (req, res) => {
                 : experience.whatsExcluded,
 
             // Text fields with null handling
-            location: formData.location || experience.location,
-            difficultyLevel: formData.difficultyLevel || experience.difficultyLevel,
-            duration: formData.duration || experience.duration,
-            guideType: formData.guideType || experience.guideType,
-            noOfGuides: formData.noOfGuides || experience.noOfGuides,
-            travellMedium: formData.travellMedium || experience.travellMedium,
-            prefferedTime: formData.prefferedTime || experience.prefferedTime,
-            whatWillYouDo: formData.whatWillYouDo || experience.whatWillYouDo,
-            whatYouWillExperience: formData.whatYouWillExperience || experience.whatYouWillExperience,
-            experienceHighlights: formData.experienceHighlights || experience.experienceHighlights,
-            stepByStepItinerary: formData.stepByStepItinerary || experience.stepByStepItinerary,
-            whoCanParticipate: formData.whoCanParticipate || experience.whoCanParticipate,
-            whatToWear: formData.whatToWear || experience.whatToWear,
-            rulesAndRegulation: formData.rulesAndRegulation || experience.rulesAndRegulation,
-            carriableItems: formData.carriableItems || experience.carriableItems,
-            pickupServiceDetails: formData.pickupServiceDetails || experience.pickupServiceDetails,
-            cancellationPolicy: formData.cancellationPolicy || experience.cancellationPolicy,
-            safetyProtocols: formData.safetyProtocols || experience.safetyProtocols,
-            additionalInformation: formData.additionalInformation || experience.additionalInformation,
-            termsAndConditions: formData.termsAndConditions || experience.termsAndConditions,
-            costBreakdown: formData.costBreakdown || experience.costBreakdown,
-            billingInstructions: formData.billingInstructions || experience.billingInstructions,
+            location: formData.location,
+            difficultyLevel: formData.difficultyLevel,
+            duration: formData.duration,
+            guideType: formData.guideType,
+            noOfGuides: formData.noOfGuides,
+            travellMedium: formData.travellMedium,
+            prefferedTime: formData.prefferedTime,
+            whatWillYouDo: formData.whatWillYouDo,
+            whatYouWillExperience: formData.whatYouWillExperience,
+            experienceHighlights: formData.experienceHighlights,
+            stepByStepItinerary: formData.stepByStepItinerary,
+            whoCanParticipate: formData.whoCanParticipate,
+            whatToWear: formData.whatToWear,
+            rulesAndRegulation: formData.rulesAndRegulation,
+            carriableItems: formData.carriableItems,
+            pickupServiceDetails: formData.pickupServiceDetails,
+            cancellationPolicy: formData.cancellationPolicy,
+            safetyProtocols: formData.safetyProtocols,
+            additionalInformation: formData.additionalInformation,
+            termsAndConditions: formData.termsAndConditions,
+            costBreakdown: formData.costBreakdown,
+            billingInstructions: formData.billingInstructions,
             department_id: formData.department_id || experience.department_id,
-            price: normalizePrice(formData.price) ?? normalizePrice(experience.price),
+            price: normalizePrice(formData.price),
         };
 
 
