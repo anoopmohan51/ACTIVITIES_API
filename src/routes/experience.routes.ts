@@ -733,7 +733,7 @@ router.post('/filter', async (req, res) => {
         const offset = parseInt(req.query.offset as string) || 0; // Default offset to 0
         
         // Get filters from request body
-        const { status, categoryId ,site_id,company_id,current_approval_level,user_id} = req.body;
+        const { status, categoryId ,site_id,company_id,current_approval_level,user_id,seasonId} = req.body;
         // Build where clause
         const whereClause: any = {
             is_delete: false, // Always exclude deleted records
@@ -752,6 +752,9 @@ router.post('/filter', async (req, res) => {
         }
         if (current_approval_level) {
             whereClause.current_approval_level = current_approval_level;
+        }
+        if (seasonId){
+            whereClause.seasonId=seasonId
         }
         
         // Handle status filter with user_id restriction
@@ -961,7 +964,6 @@ router.patch('/:id', async (req, res) => {
         } else if (status === 'approved') {
             action = 'approved';
         }
-        console.log("newApprovalLevel:::::::::::", newApprovalLevel);
         // Update experience with new status and approval level
         await experience.update({
             status: status,
@@ -1160,6 +1162,9 @@ router.post('/approval/filter', async (req, res) => {
             }
             if (filter.site_id) {
                 experienceWhere.site_id = filter.site_id;
+            }
+            if (filter.seasonId){
+                experienceWhere.seasonId = filter.seasonId
             }
         }
 
