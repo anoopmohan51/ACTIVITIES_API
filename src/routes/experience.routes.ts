@@ -165,7 +165,6 @@ router.post('/', async (req, res) => {
                 action: 'created'
             });
         } catch (logError) {
-            console.error('Error creating approval log:', logError);
             // Continue even if approval log creation fails
         }
         
@@ -187,7 +186,6 @@ router.post('/', async (req, res) => {
                         experience.videosUrl = videoRecord.path; // Update the instance for response
                     }
                 } catch (uploadError) {
-                    console.error('Error handling video upload:', uploadError);
                     // Continue with the response even if video upload fails
                 }
             }
@@ -202,8 +200,6 @@ router.post('/', async (req, res) => {
                     await experience.update({ imagesUrl: imagePaths });
                     experience.imagesUrl = imagePaths; // Update the instance for response
                 } catch (uploadError) {
-                    console.error('Error handling images upload:', uploadError);
-                    console.error('Error details:', JSON.stringify(uploadError, null, 2));
                     // Continue with the response even if image upload fails
                 }
             }
@@ -215,8 +211,6 @@ router.post('/', async (req, res) => {
         });
 
     } catch (error: unknown) {
-        console.error('Error creating experience:', error);
-        
         // Handle specific error cases
         if (error instanceof Error) {
             if (error.message.includes('undefined')) {
@@ -319,7 +313,6 @@ router.get('/:id', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching experience:', error);
         return handleErrorResponse(res, {
             statusCode: 500,
             message: error instanceof Error ? error.message : 'Internal server error',
@@ -385,7 +378,6 @@ router.delete('/:id', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error deleting experience:', error);
         return handleErrorResponse(res, {
             statusCode: 500,
             message: error instanceof Error ? error.message : 'Internal server error',
@@ -504,8 +496,6 @@ router.put('/:id', async (req, res) => {
                     await experience.update({ videosUrl: '' });
                     experience.videosUrl = ''; // Update the instance for response
                 } catch (removeError) {
-                    console.error('Error removing video:', removeError);
-                    console.error('Error details:', removeError instanceof Error ? removeError.message : removeError);
                 }
             } else if (files.video && files.video[0]) {
                 // Upload new video
@@ -516,8 +506,6 @@ router.put('/:id', async (req, res) => {
                         experience.videosUrl = videoRecord.path; // Update the instance for response
                     }
                 } catch (uploadError) {
-                    console.error('Error handling video upload:', uploadError);
-                    console.error('Error details:', uploadError instanceof Error ? uploadError.message : uploadError);
                 }
             } else {
             }
@@ -534,7 +522,6 @@ router.put('/:id', async (req, res) => {
                     await handleImagesUpload(null, experience.id);
                     currentImages = [];
                 } catch (removeError) {
-                    console.error('Error removing images:', removeError);
                 }
             }
             // Handle image updates
@@ -568,7 +555,6 @@ router.put('/:id', async (req, res) => {
                     // Update current images
                     currentImages = imageRecords;
                 } catch (uploadError) {
-                    console.error('Error handling images:', uploadError);
                 }
             }
             
@@ -629,8 +615,6 @@ router.put('/:id', async (req, res) => {
         });
 
     } catch (error: unknown) {
-        console.error('Error updating experience:', error);
-        
         if (error instanceof Error) {
             return handleErrorResponse(res, {
                 statusCode: 500,
@@ -714,7 +698,6 @@ router.get('/site/:siteId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching experiences:', error);
         return handleErrorResponse(res, {
             statusCode: 500,
             message: error instanceof Error ? error.message : 'Internal server error'
@@ -863,7 +846,6 @@ router.post('/filter', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error filtering experiences:', error);
         return handleErrorResponse(res, {
             statusCode: 500,
             message: error instanceof Error ? error.message : 'Internal server error',
@@ -1011,7 +993,6 @@ router.patch('/:id', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error updating experience approval status:', error);
         return handleErrorResponse(res, {
             statusCode: 500,
             message: error instanceof Error ? error.message : 'Internal server error',
@@ -1143,7 +1124,6 @@ router.post('/approval/filter', async (req, res) => {
                     }
                 }
             }
-            console.log("userLevels after adding max_level+1:", userLevels);
         }
         // Build where clause for experiences
         const experienceWhere: any = {
@@ -1276,7 +1256,6 @@ router.post('/approval/filter', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error filtering experiences for approval:', error);
         return handleErrorResponse(res, {
             statusCode: 500,
             message: error instanceof Error ? error.message : 'Internal server error',
@@ -1332,7 +1311,6 @@ router.get('/approval_level/:company_id', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error getting approval levels count:', error);
         return handleErrorResponse(res, {
             statusCode: 500,
             message: error instanceof Error ? error.message : 'Internal server error',

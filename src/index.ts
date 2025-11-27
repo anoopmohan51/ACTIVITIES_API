@@ -116,7 +116,6 @@ app.use((req, res, next) => {
     if ((req.method === 'POST' || req.method === 'PUT') && req.is('multipart/form-data')) {
         fileUpload(req, res, (err: any) => {
             if (err) {
-                console.error('Multer error:', err);
                 return res.status(400).json({
                     success: false,
                     message: 'Error processing form data',
@@ -191,7 +190,6 @@ const startServer = async () => {
       console.log(`Server is running on port ${port}`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
     process.exit(1);
   }
 };

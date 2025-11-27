@@ -23,8 +23,6 @@ export const handleVideoUpload = async (video: VideoFile | null, experience_id: 
 
         // If video is null or undefined, remove all existing videos
         if (!video) {
-            console.log(`Removing all videos for experience ${experience_id}`);
-            
             // Delete all files in the experience directory
             if (fs.existsSync(experienceDirPath)) {
                 const files = fs.readdirSync(experienceDirPath);
@@ -32,33 +30,26 @@ export const handleVideoUpload = async (video: VideoFile | null, experience_id: 
                     const filePath = path.join(experienceDirPath, file);
                     try {
                         fs.unlinkSync(filePath);
-                        console.log(`Deleted file: ${filePath}`);
                     } catch (error) {
-                        console.error(`Error deleting file ${filePath}:`, error);
                     }
                 }
                 
                 // Remove the empty directory
                 try {
                     fs.rmdirSync(experienceDirPath);
-                    console.log(`Removed directory: ${experienceDirPath}`);
                 } catch (error) {
-                    console.error(`Error removing directory ${experienceDirPath}:`, error);
                 }
             }
 
             // Delete all database records
             for (const existingVideo of existingVideos) {
                 await existingVideo.destroy();
-                console.log(`Deleted video record: ${existingVideo.id}`);
             }
 
             return null;
         }
 
         // Handle new video upload
-        console.log(`Uploading new video for experience ${experience_id}`);
-        
         // Extract the original file name and extension
         const originalFileName = video.originalname;
         const fileExtension = path.extname(originalFileName);
@@ -94,11 +85,9 @@ export const handleVideoUpload = async (video: VideoFile | null, experience_id: 
             // Delete file if exists
             if (fs.existsSync(path.join(__dirname, '..', '..', existingFilePath))) {
                 fs.unlinkSync(path.join(__dirname, '..', '..', existingFilePath));
-                console.log(`Deleted old video file: ${existingFilePath}`);
             }
             // Delete database record
             await existingVideo.destroy();
-            console.log(`Deleted old video record: ${existingVideo.id}`);
         }
         
         // Create new video record in database
@@ -109,10 +98,8 @@ export const handleVideoUpload = async (video: VideoFile | null, experience_id: 
             uploaded_file_name: originalFileName
         });
         
-        console.log(`Created new video record: ${videoRecord.id}`);
         return videoRecord;
     } catch (error) {
-        console.error('Error handling video upload:', error);
         throw error;
     }
 };

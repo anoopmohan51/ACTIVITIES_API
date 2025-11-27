@@ -189,7 +189,6 @@ export const importExperiences = async (req: Request & { file?: Express.Multer.F
                 });
 
             } catch (error) {
-                console.error(`Error importing activity ${activity.name || 'unknown'}:`, error);
                 errors.push({
                     activity: activity.name || 'unknown',
                     error: error instanceof Error ? error.message : 'Unknown error'
@@ -225,13 +224,10 @@ export const importExperiences = async (req: Request & { file?: Express.Multer.F
         });
 
     } catch (error) {
-        console.error('Error importing experiences:', error);
-        
         // Rollback transaction in case of error
         try {
             await transaction.rollback();
         } catch (rollbackError) {
-            console.error('Error during transaction rollback:', rollbackError);
         }
         
         // Clean up uploaded file in case of error

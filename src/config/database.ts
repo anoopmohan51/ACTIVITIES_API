@@ -21,7 +21,6 @@ const dbConfig = {
 
 // Validate that password is provided
 if (!process.env.DB_PASSWORD) {
-  console.warn('Warning: DB_PASSWORD is not set in .env file. Database connection may fail.');
 }
 
 export const sequelize = new Sequelize({
@@ -46,7 +45,6 @@ export const initDatabase = async () => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       await sequelize.authenticate();
-      console.log('Database connection has been established successfully.');
       
       // Initialize models
       await initModels();
@@ -54,19 +52,14 @@ export const initDatabase = async () => {
       // Only check model consistency in development
       if (process.env.NODE_ENV === 'development') {
         await sequelize.sync({ alter: false });
-        console.log('Database models checked successfully.');
       }
       return; // Success, exit the retry loop
     } catch (error: any) {
-      console.error(`Database connection attempt ${attempt}/${maxRetries} failed:`, error.message);
-      
       if (attempt === maxRetries) {
-        console.error('Unable to connect to the database after multiple attempts:', error);
         throw error;
       }
       
       // Wait before retrying
-      console.log(`Retrying in ${retryDelay / 1000} seconds...`);
       await new Promise(resolve => setTimeout(resolve, retryDelay));
     }
   }

@@ -6,11 +6,6 @@ const seasonController = new SeasonController();
 
 // Middleware to log route matching
 router.use((req, res, next) => {
-  console.log('\nSeason Router - Incoming request:');
-  console.log('Method:', req.method);
-  console.log('Path:', req.path);
-  console.log('Params:', req.params);
-  console.log('Route stack:', router.stack.map(r => r.route?.path));
   next();
 });
 

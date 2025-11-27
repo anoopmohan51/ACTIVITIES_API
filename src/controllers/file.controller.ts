@@ -77,7 +77,6 @@ export class FileController {
     fileStream.pipe(res);
 
     fileStream.on('error', (err) => {
-      console.error('Error streaming file:', err);
       if (!res.headersSent) {
         res.status(500).json({
           success: false,

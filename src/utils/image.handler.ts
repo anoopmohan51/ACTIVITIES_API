@@ -23,13 +23,9 @@ const deleteFileIfExists = (filePath: string): void => {
     try {
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
-            console.log(`Successfully deleted file: ${filePath}`);
-        } else {
-            console.log(`File does not exist, skipping: ${filePath}`);
         }
     } catch (error) {
-        console.error(`Error deleting file ${filePath}:`, error);
-        // Don't throw, just log the error and continue
+        // Don't throw, just continue
     }
 };
 
@@ -48,13 +44,11 @@ const saveImageAndCreateRecord = async (
         
         // Verify source file exists and is valid
         if (!fs.existsSync(image.path) || image.size === 0) {
-            console.log(`Invalid source file: ${image.path}`);
             return null;
         }
 
         // Copy file to destination
         fs.copyFileSync(image.path, filePath);
-        console.log(`Saved image to: ${filePath}`);
 
         // Create database record
         const imagePath = `/images/${experienceId}/${newFileName}`;
@@ -65,10 +59,8 @@ const saveImageAndCreateRecord = async (
             uploaded_file_name: image.originalname
         });
 
-        console.log(`Created database record for: ${image.originalname}`);
         return imageRecord;
     } catch (error) {
-        console.error(`Failed to save image ${image.originalname}:`, error);
         return null;
     }
 };
@@ -82,12 +74,9 @@ export const handleImagesUpload = async (images: ImageFile[] | null, experienceI
         const existingImages = await ExperienceImage.findAll({
             where: { experience_id: experienceId }
         });
-        console.log('Found existing images:', existingImages.length);
 
         // Handle case when no new images are provided
         if (!images || images.length === 0) {
-            console.log('No new images provided, removing all existing images');
-            
             // Delete all existing files and records
             for (const image of existingImages) {
                 // Resolve path relative to project root (image.path is like /images/13/file.jpg)
@@ -101,10 +90,8 @@ export const handleImagesUpload = async (images: ImageFile[] | null, experienceI
                 try {
                     // Try to remove directory (only works if empty)
                     fs.rmdirSync(experienceDirPath);
-                    console.log(`Removed empty directory: ${experienceDirPath}`);
                 } catch (error) {
                     // Directory might not be empty or already deleted
-                    console.log(`Could not remove directory (may not be empty): ${experienceDirPath}`);
                 }
             }
             
@@ -112,29 +99,22 @@ export const handleImagesUpload = async (images: ImageFile[] | null, experienceI
         }
 
         // Always delete all existing images and files first when new images are provided
-        console.log('Removing all existing images for experience:', experienceId);
-        
         // Delete all files from database records
         for (const existingImage of existingImages) {
             // Resolve path relative to project root (image.path is like /images/13/file.jpg)
             const filePath = path.join(__dirname, '..', '..', existingImage.path);
-            console.log(`Attempting to delete file: ${filePath}`);
             deleteFileIfExists(filePath);
             await existingImage.destroy();
-            console.log(`Deleted database record for: ${existingImage.path}`);
         }
 
         // Ensure directory exists for new uploads
         ensureDirectory(experienceDirPath);
-        console.log('Directory ensured:', experienceDirPath);
 
         // Process and save all new images
-        console.log(`Processing ${images.length} new images`);
         for (const image of images) {
             const newImageRecord = await saveImageAndCreateRecord(image, experienceId, experienceDirPath);
             if (newImageRecord) {
                 imageRecords.push(newImageRecord);
-                console.log(`Successfully saved image: ${image.originalname}`);
             }
         }
 
@@ -157,8 +137,6 @@ export const handleImagesUpload = async (images: ImageFile[] | null, experienceI
                     })
                 );
                 
-                console.log(`Checking for orphaned files: ${filesInDirectory.length} files in directory, ${validFileNames.size} valid in database`);
-                
                 // Delete files that are not in the database
                 for (const file of filesInDirectory) {
                     const filePath = path.join(experienceDirPath, file);
@@ -166,18 +144,14 @@ export const handleImagesUpload = async (images: ImageFile[] | null, experienceI
                     
                     if (stats.isFile() && !validFileNames.has(file)) {
                         deleteFileIfExists(filePath);
-                        console.log(`Deleted orphaned file (not in database): ${file}`);
                     }
                 }
             } catch (error) {
-                console.error(`Error cleaning orphaned files in ${experienceDirPath}:`, error);
             }
         }
 
-        console.log(`Successfully processed ${imageRecords.length} images for experience ${experienceId}`);
         return imageRecords;
     } catch (error) {
-        console.error('Error in handleImagesUpload:', error);
         return imageRecords;
     }
 };
