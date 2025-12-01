@@ -3,6 +3,7 @@ import { Category } from './Category';
 import { Season } from './Season';
 import { ExperienceVideo } from './ExperienceVideo';
 import { ExperienceImage } from './ExperienceImage';
+import { ExperiencePDF } from './ExperiencePDF';
 
 interface ExperienceAttributes {
     images?: ExperienceImage[];
@@ -131,6 +132,11 @@ export class Experience extends Model<ExperienceAttributes> {
         this.hasMany(ExperienceImage, {
             foreignKey: 'experience_id',
             as: 'images',
+            onDelete: 'CASCADE'
+        });
+        this.hasMany(ExperiencePDF, {
+            foreignKey: 'experience_id',
+            as: 'pdfs',
             onDelete: 'CASCADE'
         });
     }

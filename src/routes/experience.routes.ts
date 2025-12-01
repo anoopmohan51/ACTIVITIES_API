@@ -6,12 +6,14 @@ import { Experience } from '../models/Experience';
 import { Category } from '../models/Category';
 import { Season } from '../models/Season';
 import { ExperienceImage } from '../models/ExperienceImage';
+import { ExperiencePDF } from '../models/ExperiencePDF';
 import { ApprovalLogs } from '../models/ApprovalLogs';
 import { ApprovalLevels } from '../models/ApprovalLevels';
 import { LevelMapping } from '../models/LevelMapping';
 import { handleErrorResponse, handleSuccessResponse } from '../utils/response.handler';
 import { handleVideoUpload } from '../utils/video.handler';
 import { handleImagesUpload } from '../utils/image.handler';
+import { handlePDFsUpload } from '../utils/pdf.handler';
 
 const router: Router = express.Router();
 
@@ -203,6 +205,15 @@ router.post('/', async (req, res) => {
                     // Continue with the response even if image upload fails
                 }
             }
+
+            // Handle PDF upload
+            if (files.pdfs && files.pdfs.length > 0) {
+                try {
+                    await handlePDFsUpload(files.pdfs, experience.id);
+                } catch (uploadError) {
+                    // Continue with the response even if PDF upload fails
+                }
+            }
         }
 
         return handleSuccessResponse(res, {
@@ -274,6 +285,11 @@ router.get('/:id', async (req, res) => {
                     model: ExperienceImage,
                     as: 'images',
                     attributes: ['id', 'path', 'name', 'uploaded_file_name']
+                },
+                {
+                    model: ExperiencePDF,
+                    as: 'pdfs',
+                    attributes: ['id', 'path', 'name', 'uploaded_file_name']
                 }
             ]
         });
@@ -291,6 +307,16 @@ router.get('/:id', async (req, res) => {
 
         // Get image URLs from the related images
         const imageUrls = experience.images?.map(img => img.path) || [];
+        // Get PDF data from the related PDFs (including path and uploaded file name)
+        const pdfsData = (experience as any).pdfs?.map((pdf: ExperiencePDF) => ({
+            id: pdf.id,
+            path: pdf.path,
+            name: pdf.name,
+            uploaded_file_name: pdf.uploaded_file_name
+        })) || [];
+        
+        // Extract uploaded PDF names
+        const uploadedPdfNames = pdfsData.map((pdf: any) => pdf.uploaded_file_name).filter((name: string | null) => name !== null);
 
         // Prepare response data
         const experienceJson = experience.toJSON();
@@ -298,13 +324,14 @@ router.get('/:id', async (req, res) => {
             ...experienceJson,
             videosUrl: experience.videosUrl || null,
             imagesUrl: imageUrls,
+            pdfsUrl: pdfsData.map((pdf: any) => pdf.path), // Keep pdfsUrl for backward compatibility
+            pdfs_name: pdfsData, // Include full PDF data with uploaded file names
+            uploaded_pdf_name: uploadedPdfNames, // Array of uploaded PDF file names
             price: normalizePrice(experienceJson.price),
             category_name: (experience as any).category?.name || null,
             season_name: (experience as any).season?.name || null,
             // Remove nested relations from the response
-            images: undefined,
-            category: undefined,
-            season: undefined
+            images: undefined
         };
 
         return handleSuccessResponse(res, {
@@ -413,7 +440,6 @@ router.put('/:id', async (req, res) => {
 
         // Get form data
         const formData: Record<string, any> = req.body;
-        console.log("minimumParticipant",formData.minimumParticipant);
         
         
         // Create the experience object from form-data
@@ -480,6 +506,7 @@ router.put('/:id', async (req, res) => {
 
         // Update basic fields
         await experience.update(experienceData);
+        
 
         // Handle file uploads if provided
         if (req.files) {
@@ -563,6 +590,22 @@ router.put('/:id', async (req, res) => {
             const imagePaths = currentImages.map(img => img.path);
             await experience.update({ imagesUrl: imagePaths });
             experience.imagesUrl = imagePaths;
+
+            // Handle PDF upload
+            if (files.pdfs && files.pdfs.length > 0) {
+                try {
+                    await handlePDFsUpload(files.pdfs, experience.id);
+                } catch (uploadError) {
+                    // Continue with the response even if PDF upload fails
+                }
+            }
+            else {
+                try {
+                    await handlePDFsUpload(null, experience.id);
+                } catch (uploadError) {
+                    // Continue with the response even if PDF upload fails
+                }
+            }
         }
 
         // Get the latest image records
@@ -570,6 +613,19 @@ router.put('/:id', async (req, res) => {
             where: { experience_id: experienceId }
         });
         const imageUrls = latestImages.map(img => img.path);
+        
+        // Get the latest PDF records
+        const latestPDFs = await ExperiencePDF.findAll({
+            where: { experience_id: experienceId }
+        });
+        const pdfUrls = latestPDFs.map(pdf => pdf.path);
+        const pdfsData = latestPDFs.map(pdf => ({
+            id: pdf.id,
+            path: pdf.path,
+            name: pdf.name,
+            uploaded_file_name: pdf.uploaded_file_name
+        }));
+        const uploadedPdfNames = pdfsData.map((pdf: any) => pdf.uploaded_file_name).filter((name: string | null) => name !== null);
 
         // Get category and season data
         const updatedExperience = await Experience.findByPk(experienceId, {
@@ -600,11 +656,15 @@ router.put('/:id', async (req, res) => {
             ...experienceJson,
             videosUrl: videoUrl || null,
             imagesUrl: imageUrls, // Use the directly fetched image URLs
+            pdfsUrl: pdfUrls, // Use the directly fetched PDF URLs
+            pdfs_name: pdfsData, // Include full PDF data with uploaded file names
+            uploaded_pdf_name: uploadedPdfNames, // Array of uploaded PDF file names
             price: normalizePrice(experienceJson.price),
             category_name: (updatedExperience as any).category?.name || null,
             season_name: (updatedExperience as any).season?.name || null,
             // Remove nested relations from the response
             images: undefined,
+            pdfs: undefined,
             category: undefined,
             season: undefined
         };
@@ -792,6 +852,11 @@ router.post('/filter', async (req, res) => {
                     model: ExperienceImage,
                     as: 'images',
                     attributes: ['id', 'path', 'name', 'uploaded_file_name']
+                },
+                {
+                    model: ExperiencePDF,
+                    as: 'pdfs',
+                    attributes: ['id', 'path', 'name', 'uploaded_file_name']
                 }
             ],
             order: [['createdAt', 'DESC']] // Most recent first
@@ -809,6 +874,15 @@ router.post('/filter', async (req, res) => {
         const formattedExperiences = experiences.map(experience => {
             // Get image URLs from the related images
             const imageUrls = experience.images?.map(img => img.path) || [];
+            // Get PDF data from the related PDFs
+            const pdfsData = (experience as any).pdfs?.map((pdf: ExperiencePDF) => ({
+                id: pdf.id,
+                path: pdf.path,
+                name: pdf.name,
+                uploaded_file_name: pdf.uploaded_file_name
+            })) || [];
+            const pdfUrls = pdfsData.map((pdf: any) => pdf.path);
+            const uploadedPdfNames = pdfsData.map((pdf: any) => pdf.uploaded_file_name).filter((name: string | null) => name !== null);
 
             // Prepare response data
             const experienceJson = experience.toJSON();
@@ -816,11 +890,15 @@ router.post('/filter', async (req, res) => {
                 ...experienceJson,
                 videosUrl: experience.videosUrl || null,
                 imagesUrl: imageUrls,
+                pdfsUrl: pdfUrls,
+                pdfs_name: pdfsData, // Include full PDF data with uploaded file names
+                uploaded_pdf_name: uploadedPdfNames, // Array of uploaded PDF file names
                 price: normalizePrice(experienceJson.price),
                 category_name: (experience as any).category?.name || null,
                 season_name: (experience as any).season?.name || null,
                 // Remove nested relations from the response
                 images: undefined,
+                pdfs: undefined,
                 category: undefined,
                 season: undefined
             };
@@ -1171,6 +1249,11 @@ router.post('/approval/filter', async (req, res) => {
                     model: ExperienceImage,
                     as: 'images',
                     attributes: ['id', 'path', 'name', 'uploaded_file_name']
+                },
+                {
+                    model: ExperiencePDF,
+                    as: 'pdfs',
+                    attributes: ['id', 'path', 'name', 'uploaded_file_name']
                 }
             ],
             order: [['createdAt', 'DESC']]
@@ -1215,6 +1298,15 @@ router.post('/approval/filter', async (req, res) => {
         // Format experiences using common response structure
         const formattedExperiences = experiences.map(experience => {
             const imageUrls = experience.images?.map(img => img.path) || [];
+            // Get PDF data from the related PDFs
+            const pdfsData = (experience as any).pdfs?.map((pdf: ExperiencePDF) => ({
+                id: pdf.id,
+                path: pdf.path,
+                name: pdf.name,
+                uploaded_file_name: pdf.uploaded_file_name
+            })) || [];
+            const pdfUrls = pdfsData.map((pdf: any) => pdf.path);
+            const uploadedPdfNames = pdfsData.map((pdf: any) => pdf.uploaded_file_name).filter((name: string | null) => name !== null);
             const experienceJson = experience.toJSON();
 
             // Determine if this experience is at final approval level
@@ -1226,12 +1318,16 @@ router.post('/approval/filter', async (req, res) => {
                 ...experienceJson,
                 videosUrl: experience.videosUrl || null,
                 imagesUrl: imageUrls,
+                pdfsUrl: pdfUrls,
+                pdfs_name: pdfsData, // Include full PDF data with uploaded file names
+                uploaded_pdf_name: uploadedPdfNames, // Array of uploaded PDF file names
                 price: normalizePrice(experienceJson.price),
                 category_name: (experience as any).category?.name || null,
                 season_name: (experience as any).season?.name || null,
                 is_final_level: isFinalLevel,
                 // Remove nested relations from the response
                 images: undefined,
+                pdfs: undefined,
                 category: undefined,
                 season: undefined
             };

@@ -29,9 +29,10 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Serve static files from images and videos directories
+// Serve static files from images, videos, and pdfs directories
 app.use('/images', express.static(path.join(__dirname, '..', 'images')));
 app.use('/videos', express.static(path.join(__dirname, '..', 'videos')));
+app.use('/pdfs', express.static(path.join(__dirname, '..', 'pdfs')));
 
 // Configure multer for form-data parsing
 const multer = require('multer');
@@ -49,7 +50,12 @@ const storage = multer.diskStorage({
         }
 
 
-        const type = file.fieldname === 'video' ? 'videos' : 'images';
+        let type = 'images';
+        if (file.fieldname === 'video') {
+            type = 'videos';
+        } else if (file.fieldname === 'pdfs') {
+            type = 'pdfs';
+        }
         const dir = path.join(__dirname, '..', type, experience_id);
         
         if (!fs.existsSync(dir)) {
@@ -82,14 +88,18 @@ const upload = multer({
     },
     fileFilter: (req: any, file: any, cb: any) => {
         
-        // Accept video and images
-        if (file.fieldname === 'video' || file.fieldname === 'images') {
+        // Accept video, images, and PDFs
+        if (file.fieldname === 'video' || file.fieldname === 'images' || file.fieldname === 'pdfs') {
             if (file.fieldname === 'video' && !file.mimetype.startsWith('video/')) {
                 cb(new Error('Only video files are allowed for video upload'));
                 return;
             }
             if (file.fieldname === 'images' && !file.mimetype.startsWith('image/')) {
                 cb(new Error('Only image files are allowed for image upload'));
+                return;
+            }
+            if (file.fieldname === 'pdfs' && file.mimetype !== 'application/pdf') {
+                cb(new Error('Only PDF files are allowed for PDF upload'));
                 return;
             }
             cb(null, true);
@@ -102,7 +112,8 @@ const upload = multer({
 // Configure multer middleware for file uploads
 const fileUpload = upload.fields([
     { name: 'video', maxCount: 1 },
-    { name: 'images', maxCount: 10 }
+    { name: 'images', maxCount: 10 },
+    { name: 'pdfs', maxCount: 10 }
 ]);
 
 // Handle multipart form data for both POST and PUT

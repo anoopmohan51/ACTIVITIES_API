@@ -5,6 +5,7 @@ import { Experience } from '../models/Experience';
 import { Category } from '../models/Category';
 import { ExperienceVideo } from '../models/ExperienceVideo';
 import { ExperienceImage } from '../models/ExperienceImage';
+import { ExperiencePDF } from '../models/ExperiencePDF';
 import { ApprovalLevels } from '../models/ApprovalLevels';
 import { LevelMapping } from '../models/LevelMapping';
 import { ApprovalLogs } from '../models/ApprovalLogs';
@@ -104,6 +105,7 @@ export const initModels = async () => {
   Experience.initialize(sequelize); // Initialize Experience
   ExperienceVideo.initialize(sequelize); // Initialize ExperienceVideo after Experience
   ExperienceImage.initialize(sequelize); // Initialize ExperienceImage after Experience
+  ExperiencePDF.initialize(sequelize); // Initialize ExperiencePDF after Experience
   ApprovalLevels.initialize(sequelize); // Initialize ApprovalLevels
   LevelMapping.initialize(sequelize); // Initialize LevelMapping after ApprovalLevels
   ApprovalLogs.initialize(sequelize); // Initialize ApprovalLogs after Experience
@@ -112,6 +114,7 @@ export const initModels = async () => {
   Experience.associate();
   ExperienceVideo.associate();
   ExperienceImage.associate();
+  ExperiencePDF.associate();
   ApprovalLevels.associate();
   LevelMapping.associate();
   ApprovalLogs.associate(); // Set up ApprovalLogs associations
@@ -123,6 +126,7 @@ export const initModels = async () => {
     Experience,
     ExperienceVideo,
     ExperienceImage,
+    ExperiencePDF,
     ApprovalLevels,
     LevelMapping,
     ApprovalLogs
