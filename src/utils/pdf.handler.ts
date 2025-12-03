@@ -37,25 +37,39 @@ const savePDFAndCreateRecord = async (
     experienceDirPath: string
 ): Promise<ExperiencePDF | null> => {
     try {
-        // Create unique filename with timestamp
-        const timestamp = new Date().getTime();
-        const fileExtension = path.extname(pdf.originalname);
-        const newFileName = `${experienceId}_${timestamp}${fileExtension}`;
-        const filePath = path.join(experienceDirPath, newFileName);
-        
         // Verify source file exists and is valid
         if (!fs.existsSync(pdf.path) || pdf.size === 0) {
             return null;
         }
 
-        // Copy file to destination
-        fs.copyFileSync(pdf.path, filePath);
+        // Check if file is already in the final destination (PUT request - multer already saved it)
+        const normalizedPdfPath = path.normalize(pdf.path);
+        const normalizedDestPath = path.normalize(experienceDirPath);
+        const isAlreadyInDestination = normalizedPdfPath.startsWith(normalizedDestPath + path.sep);
+
+        let finalFileName: string;
+        let finalFilePath: string;
+
+        if (isAlreadyInDestination) {
+            // File is already saved by multer, use the multer filename directly
+            finalFileName = pdf.filename || path.basename(pdf.path);
+            finalFilePath = pdf.path; // Use the existing file path
+        } else {
+            // File is in temp directory (POST request), copy it to final destination
+            const timestamp = new Date().getTime();
+            const fileExtension = path.extname(pdf.originalname);
+            finalFileName = `${experienceId}_${timestamp}${fileExtension}`;
+            finalFilePath = path.join(experienceDirPath, finalFileName);
+            
+            // Copy file to destination
+            fs.copyFileSync(pdf.path, finalFilePath);
+        }
 
         // Create database record
-        const pdfPath = `/pdfs/${experienceId}/${newFileName}`;
+        const pdfPath = `/pdfs/${experienceId}/${finalFileName}`;
         const pdfRecord = await ExperiencePDF.create({
             experience_id: experienceId,
-            name: newFileName,
+            name: finalFileName,
             path: pdfPath,
             uploaded_file_name: pdf.originalname
         });

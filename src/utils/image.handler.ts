@@ -9,6 +9,7 @@ interface ImageFile {
     mimetype: string;
     path: string;
     size: number;
+    filename?: string;
 }
 
 // Helper function to ensure directory exists
@@ -36,25 +37,39 @@ const saveImageAndCreateRecord = async (
     experienceDirPath: string
 ): Promise<ExperienceImage | null> => {
     try {
-        // Create unique filename with timestamp
-        const timestamp = new Date().getTime();
-        const fileExtension = path.extname(image.originalname);
-        const newFileName = `${experienceId}_${timestamp}${fileExtension}`;
-        const filePath = path.join(experienceDirPath, newFileName);
-        
         // Verify source file exists and is valid
         if (!fs.existsSync(image.path) || image.size === 0) {
             return null;
         }
 
-        // Copy file to destination
-        fs.copyFileSync(image.path, filePath);
+        // Check if file is already in the final destination (PUT request - multer already saved it)
+        const normalizedImagePath = path.normalize(image.path);
+        const normalizedDestPath = path.normalize(experienceDirPath);
+        const isAlreadyInDestination = normalizedImagePath.startsWith(normalizedDestPath + path.sep);
+
+        let finalFileName: string;
+        let finalFilePath: string;
+
+        if (isAlreadyInDestination) {
+            // File is already saved by multer, use the multer filename directly
+            finalFileName = image.filename || path.basename(image.path);
+            finalFilePath = image.path; // Use the existing file path
+        } else {
+            // File is in temp directory (POST request), copy it to final destination
+            const timestamp = new Date().getTime();
+            const fileExtension = path.extname(image.originalname);
+            finalFileName = `${experienceId}_${timestamp}${fileExtension}`;
+            finalFilePath = path.join(experienceDirPath, finalFileName);
+            
+            // Copy file to destination
+            fs.copyFileSync(image.path, finalFilePath);
+        }
 
         // Create database record
-        const imagePath = `/images/${experienceId}/${newFileName}`;
+        const imagePath = `/images/${experienceId}/${finalFileName}`;
         const imageRecord = await ExperienceImage.create({
             experience_id: experienceId,
-            name: newFileName,
+            name: finalFileName,
             path: imagePath,
             uploaded_file_name: image.originalname
         });
