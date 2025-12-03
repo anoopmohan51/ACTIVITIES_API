@@ -103,17 +103,28 @@ export const importExperiences = async (req: Request & { file?: Express.Multer.F
                             company_id: activity.company_id,
                             site_id: activity.site_id,
                             is_delete: false,
-                            created_user: activity.initiated_by_id || undefined,
-                            updated_user: undefined,
-                            start_month: undefined,
-                            end_month: undefined
+                            created_user: activity.initiated_by_id || null,
+                            updated_user: "",
+                            start_month: "",
+                            end_month: ""
                         }, { transaction });
                     }
                     seasonId = season.id;
                 }
 
                 // Step 2: Map activity data to experience data
-                const status = activity.activity_status ? activity.activity_status.toLowerCase() : 'draft';
+                let status = 'draft'; // default status
+                if (activity.activity_status) {
+                    const activityStatus = activity.activity_status.toUpperCase();
+                    if (activityStatus === 'ON_REVIEW') {
+                        status = 'draft';
+                    } else if (activityStatus === 'APPROVED') {
+                        status = 'published';
+                    } else {
+                        // For other statuses, convert to lowercase
+                        status = activity.activity_status.toLowerCase();
+                    }
+                }
                 const isDelete = activity.activity_status === 'DELETED' ? true : activity.activity_status === 'ACTIVE' ? false : false;
                 
                 const experienceData = {
@@ -128,7 +139,7 @@ export const importExperiences = async (req: Request & { file?: Express.Multer.F
                     site_id: activity.site_id,
                     department_id: activity.department_id,
                     created_user: activity.initiated_by_id || undefined,
-                    updated_user: undefined,
+                    updated_user: null as any,
                     is_delete: isDelete,
                     
                     // Boolean fields
@@ -178,7 +189,6 @@ export const importExperiences = async (req: Request & { file?: Express.Multer.F
                 });
 
             } catch (error) {
-                console.error(`Error importing activity ${activity.name || 'unknown'}:`, error);
                 errors.push({
                     activity: activity.name || 'unknown',
                     error: error instanceof Error ? error.message : 'Unknown error'
@@ -214,13 +224,10 @@ export const importExperiences = async (req: Request & { file?: Express.Multer.F
         });
 
     } catch (error) {
-        console.error('Error importing experiences:', error);
-        
         // Rollback transaction in case of error
         try {
             await transaction.rollback();
         } catch (rollbackError) {
-            console.error('Error during transaction rollback:', rollbackError);
         }
         
         // Clean up uploaded file in case of error

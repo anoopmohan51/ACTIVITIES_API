@@ -26,8 +26,6 @@ export const handleSuccessResponse = (res: Response, { message, data }: SuccessR
 };
 
 export const handleErrorResponse = (res: Response, error: ErrorResponse) => {
-    console.error('Error:', error);
-    
     // Handle Sequelize validation errors
     if (error.name === 'SequelizeValidationError' && error.errors?.length) {
         return res.status(400).json({

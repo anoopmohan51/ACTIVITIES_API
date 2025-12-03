@@ -1,15 +1,15 @@
 import fs from 'fs';
 import path from 'path';
-import { ExperienceImage } from '../models/ExperienceImage';
+import { ExperiencePDF } from '../models/ExperiencePDF';
 
-interface ImageFile {
+interface PDFFile {
     fieldname: string;
     originalname: string;
     encoding: string;
     mimetype: string;
     path: string;
     size: number;
-    filename?: string;
+    filename: string;
 }
 
 // Helper function to ensure directory exists
@@ -30,79 +30,80 @@ const deleteFileIfExists = (filePath: string): void => {
     }
 };
 
-// Helper function to save image file and create database record
-const saveImageAndCreateRecord = async (
-    image: ImageFile,
+// Helper function to save PDF file and create database record
+const savePDFAndCreateRecord = async (
+    pdf: PDFFile,
     experienceId: number,
     experienceDirPath: string
-): Promise<ExperienceImage | null> => {
+): Promise<ExperiencePDF | null> => {
     try {
         // Verify source file exists and is valid
-        if (!fs.existsSync(image.path) || image.size === 0) {
+        if (!fs.existsSync(pdf.path) || pdf.size === 0) {
             return null;
         }
 
         // Check if file is already in the final destination (PUT request - multer already saved it)
-        const normalizedImagePath = path.normalize(image.path);
+        const normalizedPdfPath = path.normalize(pdf.path);
         const normalizedDestPath = path.normalize(experienceDirPath);
-        const isAlreadyInDestination = normalizedImagePath.startsWith(normalizedDestPath + path.sep);
+        const isAlreadyInDestination = normalizedPdfPath.startsWith(normalizedDestPath + path.sep);
 
         let finalFileName: string;
         let finalFilePath: string;
 
         if (isAlreadyInDestination) {
             // File is already saved by multer, use the multer filename directly
-            finalFileName = image.filename || path.basename(image.path);
-            finalFilePath = image.path; // Use the existing file path
+            finalFileName = pdf.filename || path.basename(pdf.path);
+            finalFilePath = pdf.path; // Use the existing file path
         } else {
             // File is in temp directory (POST request), copy it to final destination
             const timestamp = new Date().getTime();
-            const fileExtension = path.extname(image.originalname);
+            const fileExtension = path.extname(pdf.originalname);
             finalFileName = `${experienceId}_${timestamp}${fileExtension}`;
             finalFilePath = path.join(experienceDirPath, finalFileName);
             
             // Copy file to destination
-            fs.copyFileSync(image.path, finalFilePath);
+            fs.copyFileSync(pdf.path, finalFilePath);
         }
 
         // Create database record
-        const imagePath = `/images/${experienceId}/${finalFileName}`;
-        const imageRecord = await ExperienceImage.create({
+        const pdfPath = `/pdfs/${experienceId}/${finalFileName}`;
+        const pdfRecord = await ExperiencePDF.create({
             experience_id: experienceId,
             name: finalFileName,
-            path: imagePath,
-            uploaded_file_name: image.originalname
+            path: pdfPath,
+            uploaded_file_name: pdf.originalname
         });
 
-        return imageRecord;
+        return pdfRecord;
     } catch (error) {
         return null;
     }
 };
 
-export const handleImagesUpload = async (images: ImageFile[] | null, experienceId: number): Promise<ExperienceImage[]> => {
-    const imageRecords: ExperienceImage[] = [];
-    const experienceDirPath = path.join(__dirname, '..', '..', 'images', experienceId.toString());
+export const handlePDFsUpload = async (pdfs: PDFFile[] | null, experienceId: number): Promise<ExperiencePDF[]> => {
+    const pdfRecords: ExperiencePDF[] = [];
+    const experienceDirPath = path.join(__dirname, '..', '..', 'pdfs', experienceId.toString());
 
     try {
-        // Only process if images are provided
-        if (!images || images.length === 0) {
-            return imageRecords;
+        // Only process if PDFs are provided
+        if (!pdfs || pdfs.length === 0) {
+            return pdfRecords;
         }
 
         // Ensure directory exists for new uploads
         ensureDirectory(experienceDirPath);
 
-        // Process and save all new images (append mode - don't delete existing)
-        for (const image of images) {
-            const newImageRecord = await saveImageAndCreateRecord(image, experienceId, experienceDirPath);
-            if (newImageRecord) {
-                imageRecords.push(newImageRecord);
+        // Process and save all new PDFs (append mode - don't delete existing)
+        for (const pdf of pdfs) {
+            const newPDFRecord = await savePDFAndCreateRecord(pdf, experienceId, experienceDirPath);
+            if (newPDFRecord) {
+                pdfRecords.push(newPDFRecord);
             }
         }
 
-        return imageRecords;
+        return pdfRecords;
     } catch (error) {
-        return imageRecords;
+        return pdfRecords;
     }
 };
+

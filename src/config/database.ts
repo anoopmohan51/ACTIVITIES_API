@@ -5,6 +5,7 @@ import { Experience } from '../models/Experience';
 import { Category } from '../models/Category';
 import { ExperienceVideo } from '../models/ExperienceVideo';
 import { ExperienceImage } from '../models/ExperienceImage';
+import { ExperiencePDF } from '../models/ExperiencePDF';
 import { ApprovalLevels } from '../models/ApprovalLevels';
 import { LevelMapping } from '../models/LevelMapping';
 import { ApprovalLogs } from '../models/ApprovalLogs';
@@ -21,7 +22,6 @@ const dbConfig = {
 
 // Validate that password is provided
 if (!process.env.DB_PASSWORD) {
-  console.warn('Warning: DB_PASSWORD is not set in .env file. Database connection may fail.');
 }
 
 export const sequelize = new Sequelize({
@@ -46,7 +46,6 @@ export const initDatabase = async () => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       await sequelize.authenticate();
-      console.log('Database connection has been established successfully.');
       
       // Initialize models
       await initModels();
@@ -54,19 +53,14 @@ export const initDatabase = async () => {
       // Only check model consistency in development
       if (process.env.NODE_ENV === 'development') {
         await sequelize.sync({ alter: false });
-        console.log('Database models checked successfully.');
       }
       return; // Success, exit the retry loop
     } catch (error: any) {
-      console.error(`Database connection attempt ${attempt}/${maxRetries} failed:`, error.message);
-      
       if (attempt === maxRetries) {
-        console.error('Unable to connect to the database after multiple attempts:', error);
         throw error;
       }
       
       // Wait before retrying
-      console.log(`Retrying in ${retryDelay / 1000} seconds...`);
       await new Promise(resolve => setTimeout(resolve, retryDelay));
     }
   }
@@ -111,6 +105,7 @@ export const initModels = async () => {
   Experience.initialize(sequelize); // Initialize Experience
   ExperienceVideo.initialize(sequelize); // Initialize ExperienceVideo after Experience
   ExperienceImage.initialize(sequelize); // Initialize ExperienceImage after Experience
+  ExperiencePDF.initialize(sequelize); // Initialize ExperiencePDF after Experience
   ApprovalLevels.initialize(sequelize); // Initialize ApprovalLevels
   LevelMapping.initialize(sequelize); // Initialize LevelMapping after ApprovalLevels
   ApprovalLogs.initialize(sequelize); // Initialize ApprovalLogs after Experience
@@ -119,6 +114,7 @@ export const initModels = async () => {
   Experience.associate();
   ExperienceVideo.associate();
   ExperienceImage.associate();
+  ExperiencePDF.associate();
   ApprovalLevels.associate();
   LevelMapping.associate();
   ApprovalLogs.associate(); // Set up ApprovalLogs associations
@@ -130,6 +126,7 @@ export const initModels = async () => {
     Experience,
     ExperienceVideo,
     ExperienceImage,
+    ExperiencePDF,
     ApprovalLevels,
     LevelMapping,
     ApprovalLogs
