@@ -182,7 +182,7 @@ export const createCategory = async (req: Request, res: Response, next: NextFunc
       name,
       description,
       company_id,
-      site_id,
+      site_id:null,
       is_delete: is_delete || false,
       created_user: created_user,
       updated_user: null
@@ -229,9 +229,6 @@ export const filterCategories = async (req: Request, res: Response, next: NextFu
       is_delete: false
     };
 
-    if (site_id) {
-      whereClause.site_id = site_id;
-    }
 
     if (company_id) {
       whereClause.company_id = company_id;

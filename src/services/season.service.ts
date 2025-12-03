@@ -49,7 +49,7 @@ export class SeasonService {
         created_user: data.created_user,
         updated_user: data.updated_user,
         company_id: data.company_id,
-        site_id: data.site_id,
+        site_id: null,
         is_delete: false,
       };
 
@@ -107,9 +107,6 @@ export class SeasonService {
         is_delete: false
       };
 
-      if (site_id) {
-        whereClause.site_id = site_id;
-      }
 
       if (company_id) {
         whereClause.company_id = company_id;
