@@ -70,83 +70,19 @@ export const handleImagesUpload = async (images: ImageFile[] | null, experienceI
     const experienceDirPath = path.join(__dirname, '..', '..', 'images', experienceId.toString());
 
     try {
-        // Get existing images
-        const existingImages = await ExperienceImage.findAll({
-            where: { experience_id: experienceId }
-        });
-
-        // Handle case when no new images are provided
+        // Only process if images are provided
         if (!images || images.length === 0) {
-            // Delete all existing files and records
-            for (const image of existingImages) {
-                // Resolve path relative to project root (image.path is like /images/13/file.jpg)
-                const filePath = path.join(__dirname, '..', '..', image.path);
-                deleteFileIfExists(filePath);
-                await image.destroy();
-            }
-
-            // Remove empty directory if it exists
-            if (fs.existsSync(experienceDirPath)) {
-                try {
-                    // Try to remove directory (only works if empty)
-                    fs.rmdirSync(experienceDirPath);
-                } catch (error) {
-                    // Directory might not be empty or already deleted
-                }
-            }
-            
             return imageRecords;
-        }
-
-        // Always delete all existing images and files first when new images are provided
-        // Delete all files from database records
-        for (const existingImage of existingImages) {
-            // Resolve path relative to project root (image.path is like /images/13/file.jpg)
-            const filePath = path.join(__dirname, '..', '..', existingImage.path);
-            deleteFileIfExists(filePath);
-            await existingImage.destroy();
         }
 
         // Ensure directory exists for new uploads
         ensureDirectory(experienceDirPath);
 
-        // Process and save all new images
+        // Process and save all new images (append mode - don't delete existing)
         for (const image of images) {
             const newImageRecord = await saveImageAndCreateRecord(image, experienceId, experienceDirPath);
             if (newImageRecord) {
                 imageRecords.push(newImageRecord);
-            }
-        }
-
-        // Delete orphaned files: files in directory but NOT in database (after saving new images)
-        // Fetch all valid images from database to ensure we have the complete list
-        const validImagesInDb = await ExperienceImage.findAll({
-            where: { experience_id: experienceId }
-        });
-
-        if (fs.existsSync(experienceDirPath)) {
-            try {
-                // Get all files in the directory
-                const filesInDirectory = fs.readdirSync(experienceDirPath);
-                
-                // Get all valid file names from database
-                const validFileNames = new Set(
-                    validImagesInDb.map(img => {
-                        // Extract filename from path (e.g., /images/13/file.jpg -> file.jpg)
-                        return path.basename(img.path);
-                    })
-                );
-                
-                // Delete files that are not in the database
-                for (const file of filesInDirectory) {
-                    const filePath = path.join(experienceDirPath, file);
-                    const stats = fs.statSync(filePath);
-                    
-                    if (stats.isFile() && !validFileNames.has(file)) {
-                        deleteFileIfExists(filePath);
-                    }
-                }
-            } catch (error) {
             }
         }
 

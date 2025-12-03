@@ -13,43 +13,14 @@ interface VideoFile {
 
 export const handleVideoUpload = async (video: VideoFile | null, experience_id: number): Promise<ExperienceVideo | null> => {
     try {
-        // Get the experience directory path
-        const experienceDirPath = path.join(__dirname, '..', '..', 'videos', experience_id.toString());
-
-        // Find existing videos for this experience
-        const existingVideos = await ExperienceVideo.findAll({
-            where: { experience_id }
-        });
-
-        // If video is null or undefined, remove all existing videos
+        // Only process if video is provided
         if (!video) {
-            // Delete all files in the experience directory
-            if (fs.existsSync(experienceDirPath)) {
-                const files = fs.readdirSync(experienceDirPath);
-                for (const file of files) {
-                    const filePath = path.join(experienceDirPath, file);
-                    try {
-                        fs.unlinkSync(filePath);
-                    } catch (error) {
-                    }
-                }
-                
-                // Remove the empty directory
-                try {
-                    fs.rmdirSync(experienceDirPath);
-                } catch (error) {
-                }
-            }
-
-            // Delete all database records
-            for (const existingVideo of existingVideos) {
-                await existingVideo.destroy();
-            }
-
             return null;
         }
 
-        // Handle new video upload
+        // Get the experience directory path
+        const experienceDirPath = path.join(__dirname, '..', '..', 'videos', experience_id.toString());
+
         // Extract the original file name and extension
         const originalFileName = video.originalname;
         const fileExtension = path.extname(originalFileName);
@@ -79,21 +50,10 @@ export const handleVideoUpload = async (video: VideoFile | null, experience_id: 
         // Delete the temporary file
         fs.unlinkSync(video.path);
         
-        // Delete all previous videos
-        for (const existingVideo of existingVideos) {
-            const existingFilePath = existingVideo.path;
-            // Delete file if exists
-            if (fs.existsSync(path.join(__dirname, '..', '..', existingFilePath))) {
-                fs.unlinkSync(path.join(__dirname, '..', '..', existingFilePath));
-            }
-            // Delete database record
-            await existingVideo.destroy();
-        }
-        
-        // Create new video record in database
+        // Create new video record in database (append mode - don't delete existing)
         const videoRecord = await ExperienceVideo.create({
             experience_id,
-            name: originalFileName,
+            name: newFileName,
             path: `/videos/${experience_id}/${newFileName}`,
             uploaded_file_name: originalFileName
         });

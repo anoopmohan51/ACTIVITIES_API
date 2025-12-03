@@ -7,6 +7,7 @@ import { Category } from '../models/Category';
 import { Season } from '../models/Season';
 import { ExperienceImage } from '../models/ExperienceImage';
 import { ExperiencePDF } from '../models/ExperiencePDF';
+import { ExperienceVideo } from '../models/ExperienceVideo';
 import { ApprovalLogs } from '../models/ApprovalLogs';
 import { ApprovalLevels } from '../models/ApprovalLevels';
 import { LevelMapping } from '../models/LevelMapping';
@@ -290,6 +291,11 @@ router.get('/:id', async (req, res) => {
                     model: ExperiencePDF,
                     as: 'pdfs',
                     attributes: ['id', 'path', 'name', 'uploaded_file_name']
+                },
+                {
+                    model: ExperienceVideo,
+                    as: 'videos',
+                    attributes: ['id', 'path', 'name', 'uploaded_file_name']
                 }
             ]
         });
@@ -318,11 +324,15 @@ router.get('/:id', async (req, res) => {
         // Extract uploaded PDF names
         const uploadedPdfNames = pdfsData.map((pdf: any) => pdf.uploaded_file_name).filter((name: string | null) => name !== null);
 
+        // Get video URL from the related videos (use first video if exists, otherwise null)
+        const videos = (experience as any).videos || [];
+        const videoUrl = videos.length > 0 ? videos[0].path : null;
+
         // Prepare response data
         const experienceJson = experience.toJSON();
         const responseData = {
             ...experienceJson,
-            videosUrl: experience.videosUrl || null,
+            videosUrl: videoUrl,
             imagesUrl: imageUrls,
             pdfsUrl: pdfsData.map((pdf: any) => pdf.path), // Keep pdfsUrl for backward compatibility
             pdfs_name: pdfsData, // Include full PDF data with uploaded file names
@@ -331,7 +341,9 @@ router.get('/:id', async (req, res) => {
             category_name: (experience as any).category?.name || null,
             season_name: (experience as any).season?.name || null,
             // Remove nested relations from the response
-            images: undefined
+            images: undefined,
+            videos: undefined,
+            pdfs: undefined
         };
 
         return handleSuccessResponse(res, {
@@ -508,102 +520,52 @@ router.put('/:id', async (req, res) => {
         await experience.update(experienceData);
         
 
-        // Handle file uploads if provided
+        // Handle file uploads if provided - only save files, don't delete existing
         if (req.files) {
             const files = req.files as { [fieldname: string]: Express.Multer.File[] };
             
-
-            // Check if video field exists and is empty or invalid
-            const shouldRemoveVideo = ('video' in formData) && 
-                (!files.video || !files.video[0] || files.video[0].size === 0);
-
-            if (shouldRemoveVideo) {
-                // Remove existing video
-                try {
-                    await handleVideoUpload(null, experience.id);
-                    await experience.update({ videosUrl: '' });
-                    experience.videosUrl = ''; // Update the instance for response
-                } catch (removeError) {
-                }
-            } else if (files.video && files.video[0]) {
-                // Upload new video
+            // Handle video upload - only if video exists in payload
+            if (files.video && files.video[0] && files.video[0].size > 0) {
                 try {
                     const videoRecord = await handleVideoUpload(files.video[0], experience.id);
                     if (videoRecord) {
                         await experience.update({ videosUrl: videoRecord.path });
-                        experience.videosUrl = videoRecord.path; // Update the instance for response
+                        experience.videosUrl = videoRecord.path;
                     }
                 } catch (uploadError) {
-                }
-            } else {
-            }
-
-            
-            // Get existing images first
-            let currentImages = await ExperienceImage.findAll({
-                where: { experience_id: experience.id }
-            });
-
-            // Check if we should remove images
-            if (formData.removeImages === 'true') {
-                try {
-                    await handleImagesUpload(null, experience.id);
-                    currentImages = [];
-                } catch (removeError) {
+                    // Continue even if video upload fails
                 }
             }
-            // Handle image updates
-            else {
-                let imagesToProcess = null;
-                
-                // Check if we have valid images in the request
-                if (files.images && files.images.length > 0) {
-                    
-                    // Filter out invalid images (like /path/to/file)
-                    const validImages = files.images.filter(img => {
-                        const isValid = img.originalname !== 'file' && img.size > 0;
-                        if (!isValid) {
-                        }
-                        return isValid;
-                    });
 
-                    if (validImages.length > 0) {
-                        imagesToProcess = validImages;
-                    } else {
-                        imagesToProcess = null;
+            // Handle image uploads - only if images exist in payload
+            if (files.images && files.images.length > 0) {
+                // Filter out invalid images (like /path/to/file)
+                const validImages = files.images.filter(img => {
+                    return img.originalname !== 'file' && img.size > 0;
+                });
+
+                if (validImages.length > 0) {
+                    try {
+                        await handleImagesUpload(validImages, experience.id);
+                    } catch (uploadError) {
+                        // Continue even if image upload fails
                     }
-                } else {
-                    imagesToProcess = null;
-                }
-
-                try {
-                    // Process images or remove existing ones if no valid images
-                    const imageRecords = await handleImagesUpload(imagesToProcess, experience.id);
-                    
-                    // Update current images
-                    currentImages = imageRecords;
-                } catch (uploadError) {
                 }
             }
-            
-            // Update experience with current image paths
-            const imagePaths = currentImages.map(img => img.path);
-            await experience.update({ imagesUrl: imagePaths });
-            experience.imagesUrl = imagePaths;
 
-            // Handle PDF upload
+            // Handle PDF upload - only if PDFs exist in payload
             if (files.pdfs && files.pdfs.length > 0) {
-                try {
-                    await handlePDFsUpload(files.pdfs, experience.id);
-                } catch (uploadError) {
-                    // Continue with the response even if PDF upload fails
-                }
-            }
-            else {
-                try {
-                    await handlePDFsUpload(null, experience.id);
-                } catch (uploadError) {
-                    // Continue with the response even if PDF upload fails
+                // Filter out invalid PDFs
+                const validPDFs = files.pdfs.filter(pdf => {
+                    return pdf.originalname !== 'file' && pdf.size > 0 && pdf.mimetype === 'application/pdf';
+                });
+
+                if (validPDFs.length > 0) {
+                    try {
+                        await handlePDFsUpload(validPDFs, experience.id);
+                    } catch (uploadError) {
+                        // Continue even if PDF upload fails
+                    }
                 }
             }
         }
@@ -627,6 +589,12 @@ router.put('/:id', async (req, res) => {
         }));
         const uploadedPdfNames = pdfsData.map((pdf: any) => pdf.uploaded_file_name).filter((name: string | null) => name !== null);
 
+        // Get the latest video records
+        const latestVideos = await ExperienceVideo.findAll({
+            where: { experience_id: experienceId }
+        });
+        const videoUrl = latestVideos.length > 0 ? latestVideos[0].path : null;
+
         // Get category and season data
         const updatedExperience = await Experience.findByPk(experienceId, {
             include: [
@@ -647,9 +615,6 @@ router.put('/:id', async (req, res) => {
             throw new Error('Failed to fetch updated experience');
         }
 
-        // Get the current video URL
-        const videoUrl = updatedExperience.videosUrl;
-
         // Prepare response data with the latest media URLs and flatten category/season
         const experienceJson = updatedExperience.toJSON();
         const responseData = {
@@ -665,6 +630,7 @@ router.put('/:id', async (req, res) => {
             // Remove nested relations from the response
             images: undefined,
             pdfs: undefined,
+            videos: undefined,
             category: undefined,
             season: undefined
         };
@@ -857,6 +823,11 @@ router.post('/filter', async (req, res) => {
                     model: ExperiencePDF,
                     as: 'pdfs',
                     attributes: ['id', 'path', 'name', 'uploaded_file_name']
+                },
+                {
+                    model: ExperienceVideo,
+                    as: 'videos',
+                    attributes: ['id', 'path', 'name', 'uploaded_file_name']
                 }
             ],
             order: [['createdAt', 'DESC']] // Most recent first
@@ -884,11 +855,15 @@ router.post('/filter', async (req, res) => {
             const pdfUrls = pdfsData.map((pdf: any) => pdf.path);
             const uploadedPdfNames = pdfsData.map((pdf: any) => pdf.uploaded_file_name).filter((name: string | null) => name !== null);
 
+            // Get video URL from the related videos (use first video if exists, otherwise null)
+            const videos = (experience as any).videos || [];
+            const videoUrl = videos.length > 0 ? videos[0].path : null;
+
             // Prepare response data
             const experienceJson = experience.toJSON();
             const responseData = {
                 ...experienceJson,
-                videosUrl: experience.videosUrl || null,
+                videosUrl: videoUrl,
                 imagesUrl: imageUrls,
                 pdfsUrl: pdfUrls,
                 pdfs_name: pdfsData, // Include full PDF data with uploaded file names
@@ -899,6 +874,7 @@ router.post('/filter', async (req, res) => {
                 // Remove nested relations from the response
                 images: undefined,
                 pdfs: undefined,
+                videos: undefined,
                 category: undefined,
                 season: undefined
             };
@@ -1254,6 +1230,11 @@ router.post('/approval/filter', async (req, res) => {
                     model: ExperiencePDF,
                     as: 'pdfs',
                     attributes: ['id', 'path', 'name', 'uploaded_file_name']
+                },
+                {
+                    model: ExperienceVideo,
+                    as: 'videos',
+                    attributes: ['id', 'path', 'name', 'uploaded_file_name']
                 }
             ],
             order: [['createdAt', 'DESC']]
@@ -1307,6 +1288,11 @@ router.post('/approval/filter', async (req, res) => {
             })) || [];
             const pdfUrls = pdfsData.map((pdf: any) => pdf.path);
             const uploadedPdfNames = pdfsData.map((pdf: any) => pdf.uploaded_file_name).filter((name: string | null) => name !== null);
+            
+            // Get video URL from the related videos (use first video if exists, otherwise null)
+            const videos = (experience as any).videos || [];
+            const videoUrl = videos.length > 0 ? videos[0].path : null;
+            
             const experienceJson = experience.toJSON();
 
             // Determine if this experience is at final approval level
@@ -1316,7 +1302,7 @@ router.post('/approval/filter', async (req, res) => {
 
             return {
                 ...experienceJson,
-                videosUrl: experience.videosUrl || null,
+                videosUrl: videoUrl,
                 imagesUrl: imageUrls,
                 pdfsUrl: pdfUrls,
                 pdfs_name: pdfsData, // Include full PDF data with uploaded file names
@@ -1328,6 +1314,7 @@ router.post('/approval/filter', async (req, res) => {
                 // Remove nested relations from the response
                 images: undefined,
                 pdfs: undefined,
+                videos: undefined,
                 category: undefined,
                 season: undefined
             };
@@ -1404,6 +1391,165 @@ router.get('/approval_level/:company_id', async (req, res) => {
                 company_id: company_id,
                 total_levels: count,
                 max_level: maxLevel || 0,
+            }
+        });
+
+    } catch (error) {
+        return handleErrorResponse(res, {
+            statusCode: 500,
+            message: error instanceof Error ? error.message : 'Internal server error',
+            errors: [{
+                path: 'server',
+                message: error instanceof Error ? error.message : 'An unexpected error occurred'
+            }]
+        });
+    }
+});
+
+/**
+ * @route DELETE /api/experience/:experience_id/images/:image_name
+ * @desc Delete an image, PDF, or video from an experience
+ * @query type - Type of file to delete: 'pdf', 'image', or 'video'
+ */
+router.delete('/:experience_id/files/:file_name', async (req, res) => {
+    try {
+        const experienceId = parseInt(req.params.experience_id);
+        const imageName = req.params.file_name;
+        const type = req.query.type as string;
+
+        // Validate experience_id
+        if (isNaN(experienceId)) {
+            return handleErrorResponse(res, {
+                statusCode: 400,
+                message: 'Invalid experience ID',
+                errors: [{
+                    path: 'experience_id',
+                    message: 'Experience ID must be a valid number'
+                }]
+            });
+        }
+
+        // Validate image_name
+        if (!imageName) {
+            return handleErrorResponse(res, {
+                statusCode: 400,
+                message: 'Image name is required',
+                errors: [{
+                    path: 'image_name',
+                    message: 'Image name parameter is required'
+                }]
+            });
+        }
+
+        // Validate type parameter
+        if (!type || (type !== 'pdf' && type !== 'image' && type !== 'video')) {
+            return handleErrorResponse(res, {
+                statusCode: 400,
+                message: 'Invalid or missing type parameter',
+                errors: [{
+                    path: 'type',
+                    message: 'Type must be either "pdf", "image", or "video"'
+                }]
+            });
+        }
+
+        let record: ExperienceImage | ExperiencePDF | ExperienceVideo | null = null;
+        let filePath: string = '';
+        let folderType: string = '';
+
+        // Find the record based on type
+        if (type === 'pdf') {
+            record = await ExperiencePDF.findOne({
+                where: {
+                    experience_id: experienceId,
+                    name: imageName
+                }
+            });
+            folderType = 'pdfs';
+        } else if (type === 'image') {
+            record = await ExperienceImage.findOne({
+                where: {
+                    experience_id: experienceId,
+                    name: imageName
+                }
+            });
+            folderType = 'images';
+        } else if (type === 'video') {
+            record = await ExperienceVideo.findOne({
+                where: {
+                    experience_id: experienceId,
+                    name: imageName
+                }
+            });
+            folderType = 'videos';
+        }
+
+        // Check if record exists
+        if (!record) {
+            return handleErrorResponse(res, {
+                statusCode: 404,
+                message: `${type} not found`,
+                errors: [{
+                    path: 'image_name',
+                    message: `No ${type} found with name "${imageName}" for experience ${experienceId}`
+                }]
+            });
+        }
+
+        // Construct file path
+        // For videos, extract the actual filename from the path since name stores original filename
+        if (type === 'video') {
+            const pathParts = (record as ExperienceVideo).path.split('/');
+            const actualFileName = pathParts[pathParts.length - 1];
+            filePath = path.join(__dirname, '..', '..', folderType, experienceId.toString(), actualFileName);
+        } else {
+            // For images and PDFs, name field matches the stored filename
+            filePath = path.join(__dirname, '..', '..', folderType, experienceId.toString(), imageName);
+        }
+
+        // Delete the file from filesystem
+        try {
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        } catch (fileError) {
+            // Log error but continue with database deletion
+            console.error(`Error deleting file ${filePath}:`, fileError);
+        }
+
+        // Delete the record from database
+        await record.destroy();
+
+        // Update experience's imagesUrl or videosUrl if needed
+        const experience = await Experience.findByPk(experienceId);
+        if (experience) {
+            if (type === 'image') {
+                // Get remaining images
+                const remainingImages = await ExperienceImage.findAll({
+                    where: { experience_id: experienceId }
+                });
+                const imageUrls = remainingImages.map(img => img.path);
+                await experience.update({ imagesUrl: imageUrls });
+            } else if (type === 'video') {
+                // Check if there are any remaining videos
+                const remainingVideos = await ExperienceVideo.findAll({
+                    where: { experience_id: experienceId }
+                });
+                if (remainingVideos.length === 0) {
+                    await experience.update({ videosUrl: undefined });
+                } else {
+                    // Update to the first remaining video path
+                    await experience.update({ videosUrl: remainingVideos[0].path });
+                }
+            }
+        }
+
+        return handleSuccessResponse(res, {
+            message: `${type} deleted successfully`,
+            data: {
+                experience_id: experienceId,
+                file_name: imageName,
+                type: type
             }
         });
 
