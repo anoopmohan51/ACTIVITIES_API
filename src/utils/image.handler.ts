@@ -60,8 +60,8 @@ const saveImageAndCreateRecord = async (
             const fileExtension = path.extname(image.originalname);
             finalFileName = `${experienceId}_${timestamp}${fileExtension}`;
             finalFilePath = path.join(experienceDirPath, finalFileName);
-            
-            // Copy file to destination
+
+        // Copy file to destination
             fs.copyFileSync(image.path, finalFilePath);
         }
 
